@@ -1,7 +1,8 @@
-# spiffe-csi
-SPIFFE [Container Storage Interface](https://github.com/container-storage-interface/spec/blob/master/spec.md) Driver for Kubernetes
+# SPIFFE CSI Driver
+**WARNING:** This project is in the "[Development](https://github.com/spiffe/spiffe/blob/main/MATURITY.md#development)" phase of the [SPIFFE Project Maturity Phases](https://github.com/spiffe/spiffe/blob/main/MATURITY.md).
 
-The SPIFFE CSI Driver provides an ephemeral inline volume with a Workload API
-socket provided by a SPIFFE Workload API implementation (e.g.  SPIRE Agent).
+A [Container Storage Interface](https://github.com/container-storage-interface/spec/blob/master/spec.md) driver for Kubernetes that facilitates injection of the SPIFFE Workload API.
 
-This work is still in a development phase.
+The SPIFFE Workload API is nominally served over a Unix domain socket. Some SPIFFE implementations (e.g. SPIRE) rely on DaemonSets to run one Workload API server instance per host. In these cases, it is necessary to inject the Workload API socket into each pod. The primary motivation for using a CSI driver for this purpose is to avoid the use of hostPath, which is associated with security weaknesses and is commonly disallowed by policy.
+
+This driver provides pods with an ephemeral inline volume. SPIFFE implementations can serve their Workload API socket in a central location, and the driver will bind mount this location into workload pods as directed.
