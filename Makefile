@@ -20,16 +20,16 @@ endif
 go_ldflags := '${go_ldflags}'
 
 .PHONY: default
-default: image
+default: docker-build
 
-.PHONY: image
-image:
+.PHONY: docker-build
+docker-build:
 	docker build \
 		--build-arg GIT_TAG=$(git_tag:v%=%) \
 		--build-arg GIT_COMMIT=$(git_commit) \
 		--build-arg GIT_DIRTY=$(git_dirty) \
 		--target spiffe-csi-driver \
-		-t gcr.io/spiffe-io/spiffe-csi-driver:latest-local \
+		-t ghcr.io/spiffe/spiffe-csi-driver:devel \
 		.
 
 .PHONY: build
