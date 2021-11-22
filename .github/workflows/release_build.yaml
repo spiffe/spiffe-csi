@@ -4,6 +4,17 @@ on:
     tags:
       - 'v[0-9].[0-9]+.[0-9]+'
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+      - name: Lint
+        run: make lint
   build-and-publish-images:
     runs-on: ubuntu-latest
     steps:

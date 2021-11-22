@@ -1,3 +1,39 @@
+DIR := ${CURDIR}
+
+############################################################################
+# OS/ARCH detection
+############################################################################
+os1=$(shell uname -s)
+os2=
+ifeq ($(os1),Darwin)
+os1=darwin
+os2=osx
+else ifeq ($(os1),Linux)
+os1=linux
+os2=linux
+else
+$(error unsupported OS: $(os1))
+endif
+
+arch1=$(shell uname -m)
+ifeq ($(arch1),x86_64)
+arch2=amd64
+else ifeq ($(arch1),aarch64)
+arch2=arm64
+else
+$(error unsupported ARCH: $(arch1))
+endif
+
+############################################################################
+# Vars
+############################################################################
+
+build_dir := $(DIR)/.build/$(os1)-$(arch1)
+
+golangci_lint_version = v1.43.0
+golangci_lint_dir = $(build_dir)/golangci_lint/$(golangci_lint_version)
+golangci_lint_bin = $(golangci_lint_dir)/golangci-lint
+golangci_lint_cache = $(golangci_lint_dir)/cache
 
 # There may be more than one tag. Only use one that starts with 'v' followed by
 # a number, e.g., v0.9.3.
@@ -38,3 +74,13 @@ build: | bin
 
 bin:
 	mkdir bin
+
+lint: $(golangci_lint_bin)
+	@GOLANGCI_LINT_CACHE="$(golangci_lint_cache)" $(golangci_lint_bin) run ./...
+
+$(golangci_lint_bin):
+	@echo "Installing golangci-lint $(golangci_lint_version)..."
+	@rm -rf $(dir $(golangci_lint_dir))
+	@mkdir -p $(golangci_lint_dir)
+	@mkdir -p $(golangci_lint_cache)
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(golangci_lint_dir) $(golangci_lint_version)
