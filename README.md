@@ -2,8 +2,40 @@
 
 [![Development Phase](https://img.shields.io/badge/SPIFFE-Dev-orange.svg?logoWidth=18&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHJvbGU9ImltZyIgdmlld0JveD0iMC4xMSAxLjg2IDM1OC4yOCAzNTguMjgiPjxzdHlsZT5zdmcge2VuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgMzYwIDM2MH08L3N0eWxlPjxzdHlsZT4uc3QyLC5zdDN7ZmlsbC1ydWxlOmV2ZW5vZGQ7Y2xpcC1ydWxlOmV2ZW5vZGQ7ZmlsbDojYmNkOTE4fS5zdDN7ZmlsbDojMDRiZGQ5fTwvc3R5bGU+PGcgaWQ9IkxPR08iPjxwYXRoIGQ9Ik0xMi4xIDguOWgyOC4zYzIuNyAwIDUgMi4yIDUgNXYyOC4zYzAgMi43LTIuMiA1LTUgNUgxMi4xYy0yLjcgMC01LTIuMi01LTVWMTMuOWMuMS0yLjcgMi4zLTUgNS01eiIgY2xhc3M9InN0MiIvPjxwYXRoIGQ9Ik04OC43IDguOWgyNThjMi43IDAgNSAyLjIgNSA1djI4LjNjMCAyLjctMi4yIDUtNSA1aC0yNThjLTIuNyAwLTUtMi4yLTUtNVYxMy45YzAtMi43IDIuMi01IDUtNXoiIGNsYXNzPSJzdDMiLz48cGF0aCBkPSJNMzQ2LjcgODUuNWgtMjguM2MtMi43IDAtNSAyLjItNSA1djI4LjNjMCAyLjggMi4yIDUgNSA1aDI4LjNjMi43IDAgNS0yLjIgNS01VjkwLjVjMC0yLjgtMi4zLTUtNS01eiIgY2xhc3M9InN0MiIvPjxwYXRoIGQ9Ik0xOTMuNiA4NS41SDEyLjFjLTIuNyAwLTUgMi4zLTUgNXYyOC4zYzAgMi43IDIuMiA1IDUgNWgxODEuNWMyLjcgMCA1LTIuMiA1LTVWOTAuNWMwLTIuOC0yLjItNS01LTV6IiBjbGFzcz0ic3QzIi8+PHBhdGggZD0iTTI3MC4yIDg1LjVoLTI4LjNjLTIuNyAwLTUgMi4yLTUgNXYyOC4zYzAgMi44IDIuMiA1IDUgNWgyOC4zYzIuNyAwIDUtMi4yIDUtNVY5MC41Yy0uMS0yLjgtMi4zLTUtNS01eiIgY2xhc3M9InN0MiIvPjxwYXRoIGQ9Ik0yNzAuMiAxNjJIODguN2MtMi43IDAtNSAyLjItNSA1djI4LjNjMCAyLjcgMi4yIDUgNSA1aDE4MS41YzIuNyAwIDUtMi4yIDUtNVYxNjdjLS4xLTIuOC0yLjMtNS01LTV6IiBjbGFzcz0ic3QzIi8+PHBhdGggZD0iTTM0Ni43IDE2MmgtMjguM2MtMi43IDAtNSAyLjItNSA1djI4LjNjMCAyLjggMi4yIDUgNSA1aDI4LjNjMi43IDAgNS0yLjIgNS01VjE2N2MwLTIuOC0yLjMtNS01LTV6bS0zMDYuMyAwSDEyLjFjLTIuNyAwLTUgMi4yLTUgNXYyOC4zYzAgMi44IDIuMiA1IDUgNWgyOC4zYzIuNyAwIDUtMi4yIDUtNVYxNjdjMC0yLjgtMi4yLTUtNS01em0tMjguMyA3Ni41aDI4LjNjMi43IDAgNSAyLjIgNSA1djI4LjNjMCAyLjctMi4yIDUtNSA1SDEyLjFjLTIuNyAwLTUtMi4yLTUtNXYtMjguM2MuMS0yLjcgMi4zLTUgNS01eiIgY2xhc3M9InN0MiIvPjxwYXRoIGQ9Ik0xNjUuMiAyMzguNWgxODEuNWMyLjcgMCA1IDIuMiA1IDV2MjguM2MwIDIuNy0yLjIgNS01IDVIMTY1LjJjLTIuNyAwLTUtMi4yLTUtNXYtMjguM2MwLTIuNyAyLjItNSA1LTV6IiBjbGFzcz0ic3QzIi8+PHBhdGggZD0iTTg4LjcgMjM4LjVIMTE3YzIuNyAwIDUgMi4yIDUgNXYyOC4zYzAgMi43LTIuMiA1LTUgNUg4OC43Yy0yLjcgMC01LTIuMi01LTV2LTI4LjNjMC0yLjcgMi4yLTUgNS01em0yNTggNzYuN2gtMjguM2MtMi43IDAtNSAyLjItNSA1djI4LjNjMCAyLjggMi4yIDUgNSA1aDI4LjNjMi43IDAgNS0yLjIgNS01di0yOC4zYzAtMi44LTIuMy01LTUtNXoiIGNsYXNzPSJzdDIiLz48cGF0aCBkPSJNMjcwLjIgMzE1LjJoLTI1OGMtMi43IDAtNSAyLjItNSA1djI4LjNjMCAyLjcgMi4yIDUgNSA1aDI1OGMyLjcgMCA1LTIuMiA1LTV2LTI4LjNjLS4xLTIuOC0yLjMtNS01LTV6IiBjbGFzcz0ic3QzIi8+PC9nPjwvc3ZnPg==)](https://github.com/spiffe/spiffe/blob/main/MATURITY.md#development)
 
-A [Container Storage Interface](https://github.com/container-storage-interface/spec/blob/master/spec.md) driver for Kubernetes that facilitates injection of the SPIFFE Workload API.
+A [Container Storage
+Interface](https://github.com/container-storage-interface/spec/blob/master/spec.md)
+driver for Kubernetes that facilitates injection of the SPIFFE Workload API.
 
-The SPIFFE Workload API is nominally served over a Unix domain socket. Some SPIFFE implementations (e.g. SPIRE) rely on DaemonSets to run one Workload API server instance per host. In these cases, it is necessary to inject the Workload API socket into each pod. The primary motivation for using a CSI driver for this purpose is to avoid the use of hostPath, which is associated with security weaknesses and is commonly disallowed by policy.
+The SPIFFE Workload API is nominally served over a Unix domain socket. Some
+SPIFFE implementations (e.g. SPIRE) rely on DaemonSets to run one Workload API
+server instance per host. In these cases, it is necessary to inject the
+Workload API socket into each pod. The primary motivation for using a CSI
+driver for this purpose is to avoid the use of hostPath, which is associated
+with security weaknesses and is commonly disallowed by policy.
 
-This driver provides pods with an ephemeral inline volume. SPIFFE implementations can serve their Workload API socket in a central location, and the driver will bind mount this location into workload pods as directed.
+This driver provides pods with an ephemeral inline volume. SPIFFE
+implementations can serve their Workload API socket in a central location, and
+the driver will bind mount this location into workload pods as directed.
+
+## How it Works
+
+This component is generally deployed as a container in the DaemonSet that
+provides the Workload API implementation (e.g SPIRE agent) and registered
+with the kubelet using the official CSI Node Driver Registrar image. The
+SPIFFE CSI Driver and the Workload API implementation share the directory
+hosting the Workload API Unix Domain Socket using an `emptyDir` mount.
+
+When pods declare an ephemeral inline mount using this driver, the driver
+is invoked to mount the volume. The driver bind mounts the directory containing
+the Workload API Unix Domain Socket into the container.
+
+Similarly, when the pod is destroyed, the driver is invoked and removes the
+bind mount.
+
+## Example
+
+An example can be found [here](./example). 
+
+## Reporting a Vulnerability
+
+If you've found a vulnerability please let us know at security@spiffe.io. We'll send a confirmation email both to acknowledge the report, and additionally when we've identified the issue positively or negatively.
