@@ -3,7 +3,9 @@
 
 package mount
 
-import "errors"
+import (
+	"errors"
+)
 
 func bindMountRO(src, dst string) error {
 	return errors.New("unsupported on this platform")
