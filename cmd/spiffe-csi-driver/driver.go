@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/go-logr/logr"
 	"github.com/spiffe/spiffe-csi/internal/version"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,6 +19,7 @@ type Driver struct {
 	csi.UnimplementedIdentityServer
 	csi.UnimplementedNodeServer
 
+	Log                  logr.Logger
 	NodeID               string
 	WorkloadAPISocketDir string
 }
@@ -46,8 +48,19 @@ func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeRe
 // Node Server implementation
 /////////////////////////////////////////////////////////////////////////////
 
-func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (_ *csi.NodePublishVolumeResponse, err error) {
 	ephemeralMode := req.GetVolumeContext()["csi.storage.k8s.io/ephemeral"]
+
+	log := d.Log.WithValues(
+		"request-volume-id", req.VolumeId,
+		"request-target-path", req.TargetPath,
+	)
+
+	defer func() {
+		if err != nil {
+			log.Error(err, "Failed to publish volume")
+		}
+	}()
 
 	// Validate request
 	switch {
@@ -78,10 +91,23 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 		return nil, status.Errorf(codes.Internal, "unable to mount %q: %v", req.TargetPath, err)
 	}
 
+	log.Info("Volume published")
+
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (_ *csi.NodeUnpublishVolumeResponse, err error) {
+	log := d.Log.WithValues(
+		"request-volume-id", req.VolumeId,
+		"request-target-path", req.TargetPath,
+	)
+
+	defer func() {
+		if err != nil {
+			log.Error(err, "Failed to unpublish volume")
+		}
+	}()
+
 	// Validate request
 	switch {
 	case req.VolumeId == "":
@@ -96,6 +122,8 @@ func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublish
 	if err := os.Remove(req.TargetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "unable to remove target path %q: %v", req.TargetPath, err)
 	}
+
+	log.Info("Volume unpublished")
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }

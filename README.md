@@ -25,9 +25,10 @@ with the kubelet using the official CSI Node Driver Registrar image. The
 SPIFFE CSI Driver and the Workload API implementation share the directory
 hosting the Workload API Unix Domain Socket using an `emptyDir` mount.
 
-When pods declare an ephemeral inline mount using this driver, the driver
-is invoked to mount the volume. The driver bind mounts the directory containing
-the Workload API Unix Domain Socket into the container.
+When pods declare an ephemeral inline mount using this driver, the driver is
+invoked to mount the volume. The driver does a read-only bind mount of the
+directory containing the Workload API Unix Domain Socket into the container
+at the requested target path.
 
 Similarly, when the pod is destroyed, the driver is invoked and removes the
 bind mount.
@@ -36,6 +37,33 @@ bind mount.
 
 An example can be found [here](./example). 
 
+## Troubleshooting
+
+This component has a fairly simple design and function but some of the
+following problems may manifest.
+
+### Failure to Register with the Kubelet
+
+This problem can be diagnosed by dumping the logs of the kubelet (if possible),
+the driver registrar container, and the SPIFFE CSI driver container. Likely
+suspects are a misconfiguratoin of the various volume mounts needed for
+communication between the register, the SPIFFE CSI driver, and the kubelet.
+
+### Failure to mount the socket directory
+
+This problem can be diagnosed by dumping the SPIFFE CSI driver logs.
+
+### Failure to Terminate Pods when Driver is Unhealthy Or Removed
+
+If the SPIFFE CSI Driver is removed (or is otherwise unhealthy), any pods that
+contain a volume mounted by the driver will fail to fully terminate until
+driver health is restored. The describe command (i.e. kubectl describe) will
+show the failure to unmount the volume. Kubernetes will continue to retry to
+unmount the volume via the CSI driver. Once the driver has been restored, the
+unmounting will eventually succeed and the pod will be fully terminated.
+
 ## Reporting a Vulnerability
 
-If you've found a vulnerability please let us know at security@spiffe.io. We'll send a confirmation email both to acknowledge the report, and additionally when we've identified the issue positively or negatively.
+If you've found a vulnerability please let us know at security@spiffe.io. We'll
+send a confirmation email both to acknowledge the report, and additionally when
+we've identified the issue positively or negatively.
