@@ -5,7 +5,6 @@ set -e -o pipefail
 DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Versions under test
-SPIFFE_CSI_DRIVER_VERSION=${SPIFFE_CSI_DRIVER_VERSION:-devel}
 KIND_VERSION=${KIND_VERSION:-v0.11.1}
 KUBECTL_VERSION=${KUBECTL_VERSION:-v1.22.4}
 
@@ -80,7 +79,7 @@ delete-cluster() {
 load-images() {
     echo "Loading images..."
     "${KIND}" load docker-image \
-        ghcr.io/spiffe/spiffe-csi-driver:"${SPIFFE_CSI_DRIVER_VERSION}" \
+        ghcr.io/spiffe/spiffe-csi-driver:devel \
         spiffe-csi-test-workload:test
     echo "Images loaded."
 }
@@ -142,5 +141,4 @@ load-images
 apply-yaml
 register-workload
 check-status
-
 echo "Done."

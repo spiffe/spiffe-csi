@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
 	"github.com/spiffe/spiffe-csi/internal/version"
+	"go.uber.org/zap"
 )
 
 var (
@@ -26,23 +28,32 @@ func main() {
 	}
 	flag.Parse()
 
-	log.Println("Starting...")
+	var log logr.Logger
+	zapLog, err := zap.NewDevelopment()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to set up logger: %w", err)
+		os.Exit(1)
+	}
+	log = zapr.NewLogger(zapLog)
 
 	config := Config{
+		Log:                  log,
 		NodeID:               getNodeIDFromFlags(),
 		WorkloadAPISocketDir: *workloadAPISocketDir,
 		CSISocketPath:        *csiSocketPathFlag,
 	}
 
-	log.Println("Version              :", version.Version())
-	log.Println("Node ID              :", config.NodeID)
-	log.Println("WorkloadAPISocketDir :", config.WorkloadAPISocketDir)
-	log.Println("CSISocketPath        :", config.CSISocketPath)
-
+	log.Info("Starting.",
+		"version", version.Version(),
+		"node-id", config.NodeID,
+		"workload-api-socket-dir", config.WorkloadAPISocketDir,
+		"csi-socket-path", config.CSISocketPath,
+	)
 	if err := Run(config); err != nil {
-		log.Fatal("Error:", err)
+		log.Error(err, "Failed to run")
+		os.Exit(1)
 	}
-	log.Println("Done")
+	log.Info("Done")
 }
 
 func getNodeIDFromFlags() string {

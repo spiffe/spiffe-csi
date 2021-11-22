@@ -9,10 +9,12 @@ import (
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 )
 
 type Config struct {
+	Log                  logr.Logger
 	NodeID               string
 	WorkloadAPISocketDir string
 	CSISocketPath        string
@@ -30,7 +32,7 @@ func Run(config Config) error {
 	}
 
 	if err := os.Remove(config.CSISocketPath); err != nil && !os.IsNotExist(err) {
-		log.Printf("Unable to remove CSI socket: %v", err)
+		config.Log.Error(err, "Unable to remove CSI socket")
 	}
 
 	listener, err := net.Listen("unix", config.CSISocketPath)
@@ -39,6 +41,7 @@ func Run(config Config) error {
 	}
 
 	driver := &Driver{
+		Log:                  config.Log,
 		NodeID:               config.NodeID,
 		WorkloadAPISocketDir: config.WorkloadAPISocketDir,
 	}
@@ -50,7 +53,7 @@ func Run(config Config) error {
 	csi.RegisterIdentityServer(server, driver)
 	csi.RegisterNodeServer(server, driver)
 
-	log.Println("Listening...")
+	config.Log.Info("Listening...")
 	return server.Serve(listener)
 }
 
