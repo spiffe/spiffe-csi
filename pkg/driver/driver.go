@@ -1,12 +1,15 @@
-package main
+package driver
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
 	"github.com/spiffe/spiffe-csi/internal/version"
+	"github.com/spiffe/spiffe-csi/pkg/logkeys"
+	"github.com/spiffe/spiffe-csi/pkg/mount"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -15,13 +18,36 @@ const (
 	pluginName = "csi.spiffe.io"
 )
 
+// Config is the configuration for the driver
+type Config struct {
+	Log                  logr.Logger
+	NodeID               string
+	WorkloadAPISocketDir string
+}
+
+// Driver is the ephemeral-inline CSI driver implementation
 type Driver struct {
 	csi.UnimplementedIdentityServer
 	csi.UnimplementedNodeServer
 
-	Log                  logr.Logger
-	NodeID               string
-	WorkloadAPISocketDir string
+	log                  logr.Logger
+	nodeID               string
+	workloadAPISocketDir string
+}
+
+// New creates a new driver with the given config
+func New(config Config) (*Driver, error) {
+	switch {
+	case config.NodeID == "":
+		return nil, errors.New("node ID is required")
+	case config.WorkloadAPISocketDir == "":
+		return nil, errors.New("workload API socket directory is required")
+	}
+	return &Driver{
+		log:                  config.Log,
+		nodeID:               config.NodeID,
+		workloadAPISocketDir: config.WorkloadAPISocketDir,
+	}, nil
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -51,9 +77,9 @@ func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeRe
 func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (_ *csi.NodePublishVolumeResponse, err error) {
 	ephemeralMode := req.GetVolumeContext()["csi.storage.k8s.io/ephemeral"]
 
-	log := d.Log.WithValues(
-		"request-volume-id", req.VolumeId,
-		"request-target-path", req.TargetPath,
+	log := d.log.WithValues(
+		logkeys.VolumeID, req.VolumeId,
+		logkeys.TargetPath, req.TargetPath,
 	)
 
 	defer func() {
@@ -87,7 +113,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 		return nil, status.Errorf(codes.Internal, "unable to create target path %q: %v", req.TargetPath, err)
 	}
 	// Bind mount the agent socket directory (read only) to the target path
-	if err := bindMountRO(d.WorkloadAPISocketDir, req.TargetPath); err != nil {
+	if err := mount.BindMountRO(d.workloadAPISocketDir, req.TargetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "unable to mount %q: %v", req.TargetPath, err)
 	}
 
@@ -97,9 +123,9 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 }
 
 func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (_ *csi.NodeUnpublishVolumeResponse, err error) {
-	log := d.Log.WithValues(
-		"request-volume-id", req.VolumeId,
-		"request-target-path", req.TargetPath,
+	log := d.log.WithValues(
+		logkeys.VolumeID, req.VolumeId,
+		logkeys.TargetPath, req.TargetPath,
 	)
 
 	defer func() {
@@ -116,7 +142,7 @@ func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublish
 		return nil, status.Error(codes.InvalidArgument, "request missing required target path")
 	}
 
-	if err := unmount(req.TargetPath); err != nil {
+	if err := mount.Unmount(req.TargetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "unable to unmount %q: %v", req.TargetPath, err)
 	}
 	if err := os.Remove(req.TargetPath); err != nil {
@@ -134,7 +160,7 @@ func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabi
 
 func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	return &csi.NodeGetInfoResponse{
-		NodeId:            d.NodeID,
+		NodeId:            d.nodeID,
 		MaxVolumesPerNode: 1,
 	}, nil
 }

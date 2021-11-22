@@ -1,6 +1,7 @@
+//go:build !linux
 // +build !linux
 
-package main
+package mount
 
 import "errors"
 
