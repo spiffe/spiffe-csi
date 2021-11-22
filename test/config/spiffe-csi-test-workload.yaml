@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-workload
+  namespace: default
+  labels:
+    app: test-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-workload
+  template:
+    metadata:
+      namespace: default
+      labels:
+        app: test-workload
+    spec:
+      containers:
+      - name: test-workload
+        image: spiffe-csi-test-workload:test
+        imagePullPolicy: Never
+        volumeMounts:
+        - name: spire-agent-socket
+          mountPath: /spire-agent-socket
+          readOnly: true
+        env:
+        - name: SPIFFE_ENDPOINT_SOCKET
+          value: unix:///spire-agent-socket/agent.sock
+      volumes:
+      - name: spire-agent-socket
+        csi:
+          driver: "csi.spiffe.io"
