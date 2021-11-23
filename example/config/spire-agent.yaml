@@ -51,7 +51,7 @@ data:
       log_level = "DEBUG"
       server_address = "spire-server"
       server_port = "8081"
-      socket_path = "/run/spire/sockets/agent.sock"
+      socket_path = "/run/spire/sockets/spire-agent.sock"
       trust_bundle_path = "/run/spire/bundle/bundle.crt"
       trust_domain = "example.org"
     }
@@ -102,7 +102,7 @@ spec:
       serviceAccountName: spire-agent
       containers:
         - name: spire-agent
-          image: gcr.io/spiffe-io/spire-agent:1.0.1
+          image: ghcr.io/spiffe/spire-agent:1.1.1
           imagePullPolicy: IfNotPresent
           args: ["-config", "/run/spire/config/agent.conf"]
           volumeMounts:
@@ -118,7 +118,7 @@ spec:
               mountPath: /run/spire/sockets
         # This is the container which runs the SPIFFE CSI driver.
         - name: spiffe-csi-driver
-          image: gcr.io/spiffe-io/spiffe-csi-driver:devel
+          image: ghcr.io/spiffe/spiffe-csi-driver:nightly
           imagePullPolicy: IfNotPresent
           args: [
             "-workload-api-socket-dir", "/spire-agent-socket",

@@ -35,7 +35,7 @@ bind mount.
 
 ## Example
 
-An example can be found [here](./example). 
+An example deployment can be found [here](./example). 
 
 ## Troubleshooting
 

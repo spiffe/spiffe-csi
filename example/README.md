@@ -1,16 +1,64 @@
 # SPIFFE CSI Driver Example
 
-TODO: fill this in with more detail
+This example demonstrates how to deploy the SPIFFE CSI Driver into a Kubernetes
+cluster and how to consume the Workload API Unix Domain Socket it provides
+from a SPIFFE-aware workload.
 
-1. build CSI driver image via project Makefile (then tag as test)
-1. build example workload image via workload/Makefile
-1. start kind cluster
-1. load images into kind cluster (the test tags for both the CSI driver and workload)
-1. create spire namespace
-1. apply the following yaml
-   * spiffe-csi-driver.yaml
-   * spire-server.yaml
-   * spire-agent.yaml
-   * workload.yaml
-1. create a spire entry for the workload
-1. check workload logs
+## Prerequisites
+
+- [Kind](https://kind.sigs.k8s.io/)
+- [Kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+
+## Steps
+
+1. Start a Kubernetes cluster via [Kind](https://kind.sigs.k8s.io/):
+
+    ```
+    $ kind create cluster
+    ```
+
+1. Build the example workload image and load it into Kind:
+
+    ```
+    $ ./build-and-load-workload-image.sh
+    ```
+
+1. Deploy SPIRE and the SPIFFE CSI Driver (which resides in the same DaemonSet as the SPIRE Agent):
+
+    ```
+    $ ./deploy-spire-and-csi-driver.sh
+    ```
+
+1. Register the example workload with SPIRE Server:
+
+    ```
+    $ ./register-workload.sh
+    ```
+
+1. Deploy the workload:
+
+    ```
+    $ kubectl apply -f config/workload.yaml
+    ```
+
+1. Check the workload logs to see the update received over the Workload API:
+
+    ```
+    $ kubectl logs pod/example-workload
+    ```
+
+    You should see something like:
+
+    ```
+    2021/11/23 18:46:33 Update:
+    2021/11/23 18:46:33   SVIDs:
+    2021/11/23 18:46:33     spiffe://example.org/workload
+    2021/11/23 18:46:33   Bundles:
+    2021/11/23 18:46:33     example.org (1 authorities)
+    ```
+
+1. Delete the Kubernetes cluster:
+
+    ```
+    $ kind delete cluster
+    ```
