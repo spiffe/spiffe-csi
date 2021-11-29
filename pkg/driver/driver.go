@@ -18,6 +18,12 @@ const (
 	pluginName = "csi.spiffe.io"
 )
 
+var (
+	// We replace these in tests since bind mounting generally requires root.
+	bindMountRO = mount.BindMountRO
+	unmount     = mount.Unmount
+)
+
 // Config is the configuration for the driver
 type Config struct {
 	Log                  logr.Logger
@@ -81,6 +87,9 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 		logkeys.VolumeID, req.VolumeId,
 		logkeys.TargetPath, req.TargetPath,
 	)
+	if req.VolumeCapability != nil && req.VolumeCapability.AccessMode != nil {
+		log = log.WithValues("access_mode", req.VolumeCapability.AccessMode.Mode)
+	}
 
 	defer func() {
 		if err != nil {
@@ -99,11 +108,11 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	case req.VolumeCapability.AccessType == nil:
 		return nil, status.Error(codes.InvalidArgument, "request missing required volume capability access type")
 	case !isVolumeCapabilityPlainMount(req.VolumeCapability):
-		return nil, status.Error(codes.InvalidArgument, "request volume capability access type must be mount")
+		return nil, status.Error(codes.InvalidArgument, "request volume capability access type must be a simple mount")
 	case req.VolumeCapability.AccessMode == nil:
 		return nil, status.Error(codes.InvalidArgument, "request missing required volume capability access mode")
 	case isVolumeCapabilityAccessModeReadOnly(req.VolumeCapability.AccessMode):
-		return nil, status.Error(codes.InvalidArgument, "request missing required volume capability access mode")
+		return nil, status.Error(codes.InvalidArgument, "request volume capability access mode is not valid")
 	case ephemeralMode != "true":
 		return nil, status.Error(codes.InvalidArgument, "only ephemeral volumes are supported")
 	}
@@ -113,7 +122,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 		return nil, status.Errorf(codes.Internal, "unable to create target path %q: %v", req.TargetPath, err)
 	}
 	// Bind mount the agent socket directory (read only) to the target path
-	if err := mount.BindMountRO(d.workloadAPISocketDir, req.TargetPath); err != nil {
+	if err := bindMountRO(d.workloadAPISocketDir, req.TargetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "unable to mount %q: %v", req.TargetPath, err)
 	}
 
@@ -142,7 +151,7 @@ func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublish
 		return nil, status.Error(codes.InvalidArgument, "request missing required target path")
 	}
 
-	if err := mount.Unmount(req.TargetPath); err != nil {
+	if err := unmount(req.TargetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "unable to unmount %q: %v", req.TargetPath, err)
 	}
 	if err := os.Remove(req.TargetPath); err != nil {

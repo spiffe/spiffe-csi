@@ -9,7 +9,8 @@ COPY go.mod /code/go.mod
 COPY go.sum /code/go.sum
 RUN go mod download
 ADD . /code
-RUN make GIT_TAG="${GIT_TAG}" GIT_COMMIT="${GIT_COMMIT}" GIT_DIRTY="${GIT_DIRTY}" build
+RUN CGO_ENABLED=0 go test ./...
+RUN CGO_ENABLED=0 make GIT_TAG="${GIT_TAG}" GIT_COMMIT="${GIT_COMMIT}" GIT_DIRTY="${GIT_DIRTY}" build
 
 # Build a scratch image with just the SPIFFE CSI driver binary
 FROM scratch AS spiffe-csi-driver
