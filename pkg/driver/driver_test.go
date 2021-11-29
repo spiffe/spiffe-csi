@@ -95,7 +95,7 @@ func TestBoilerplateRPCs(t *testing.T) {
 		require.NoError(t, err)
 		requireProtoEqual(t, &csi.NodeGetInfoResponse{
 			NodeId:            testNodeID,
-			MaxVolumesPerNode: 1,
+			MaxVolumesPerNode: 0,
 		}, resp, "unexpected response")
 	})
 }

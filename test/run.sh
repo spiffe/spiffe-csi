@@ -90,8 +90,10 @@ apply-yaml() {
     "${KUBECTL}" rollout status -w --timeout=1m -nspire-system deployment/spire-server
     echo "Waiting for SPIRE agent rollout..."
     "${KUBECTL}" rollout status -w --timeout=1m -nspire-system daemonset/spire-agent
-    echo "Waiting for test workload rollout..."
-    "${KUBECTL}" rollout status -w --timeout=1m deployment/test-workload
+    echo "Waiting for test workload 1 rollout..."
+    "${KUBECTL}" rollout status -w --timeout=1m deployment/test-workload-1
+    echo "Waiting for test workload 2 rollout..."
+    "${KUBECTL}" rollout status -w --timeout=1m deployment/test-workload-2
 }
 
 register-workload() {
@@ -112,14 +114,15 @@ register-workload() {
             -selector k8s:ns:default
 }
 
-check-status() {
+check-workload-status() {
+    local _which="$1"
     local _numchecks=30 
     local _interval=1
     local _status
-    echo -n "Checking Workload API update status."
+    echo -n "Checking Workload API update status on $_which."
     for ((i=1;i<=_numchecks;i++)); do
         echo -n "."
-        _status=$(kubectl exec -it deployment/test-workload -- /bin/cat status | tr -d '[:space:]')
+        _status=$(kubectl exec -it "deployment/$_which" -- /bin/cat status | tr -d '[:space:]')
         if [ "${_status}" == "updated" ]; then
             echo "ok."
             return 0
@@ -140,5 +143,7 @@ create-cluster
 load-images
 apply-yaml
 register-workload
-check-status
+check-workload-status "test-workload-1"
+check-workload-status "test-workload-2"
+"${KUBECTL}" logs -nspire-system daemonset/spire-agent -c spiffe-csi-driver
 echo "Done."

@@ -170,7 +170,7 @@ func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabi
 func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	return &csi.NodeGetInfoResponse{
 		NodeId:            d.nodeID,
-		MaxVolumesPerNode: 1,
+		MaxVolumesPerNode: 0,
 	}, nil
 }
 

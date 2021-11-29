@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-workload
+  name: test-workload-2
   namespace: default
   labels:
-    app: test-workload
+    app: test-workload-2
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-workload
+      app: test-workload-2
   template:
     metadata:
       namespace: default
       labels:
-        app: test-workload
+        app: test-workload-2
     spec:
       containers:
-      - name: test-workload
+      - name: test-workload-2
         image: spiffe-csi-test-workload:test
         imagePullPolicy: Never
         volumeMounts:
