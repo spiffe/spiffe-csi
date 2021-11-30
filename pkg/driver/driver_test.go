@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
@@ -222,7 +223,7 @@ func TestNodePublishVolume(t *testing.T) {
 				// write out a file to the target path... this will prevent our
 				// fake mount implementation from being able to write the
 				// metadata file, thus simulating a mount failure.
-				require.NoError(t, os.WriteFile(targetPath, nil, 0644))
+				require.NoError(t, os.WriteFile(targetPath, nil, 0600))
 			},
 			expectCode:      codes.Internal,
 			expectMsgPrefix: "unable to mount",
@@ -307,7 +308,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			mungeTargetPath: func(t *testing.T, targetPath string) {
 				// Prevent the directory from being removed by writing
 				// a file into it.
-				require.NoError(t, os.WriteFile(filepath.Join(targetPath, "prevent-directory-removal"), nil, 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(targetPath, "prevent-directory-removal"), nil, 0600))
 			},
 			expectCode:      codes.Internal,
 			expectMsgPrefix: "unable to remove target path",
@@ -387,15 +388,37 @@ func startDriver(t *testing.T) (client, string) {
 	require.NoError(t, err)
 	t.Cleanup(func() { l.Close() })
 	s := grpc.NewServer()
+	t.Cleanup(s.Stop)
+
 	csi.RegisterIdentityServer(s, d)
 	csi.RegisterNodeServer(s, d)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	connCh := make(chan *grpc.ClientConn, 1)
+	errCh := make(chan error, 2)
+
 	go func() {
-		s.Serve(l)
+		errCh <- s.Serve(l) // failures to serve will
 	}()
-	t.Cleanup(s.Stop)
-	conn, err := grpc.DialContext(context.Background(), l.Addr().String(), grpc.WithInsecure(), grpc.FailOnNonTempDialError(true), grpc.WithReturnConnectionError())
-	require.NoError(t, err)
-	t.Cleanup(func() { conn.Close() })
+	go func() {
+		conn, err := grpc.DialContext(ctx, l.Addr().String(), grpc.WithInsecure(), grpc.FailOnNonTempDialError(true), grpc.WithReturnConnectionError())
+		if err != nil {
+			errCh <- err
+		} else {
+			connCh <- conn
+		}
+	}()
+
+	var conn *grpc.ClientConn
+	select {
+	case conn = <-connCh:
+		t.Cleanup(func() { conn.Close() })
+	case err := <-errCh:
+		require.NoError(t, err)
+	}
+
 	return client{
 		IdentityClient: csi.NewIdentityClient(conn),
 		NodeClient:     csi.NewNodeClient(conn),
@@ -421,7 +444,7 @@ func readMeta(targetPath string) (string, error) {
 }
 
 func writeMeta(targetPath string, meta string) error {
-	return os.WriteFile(metaPath(targetPath), []byte(meta), 0644)
+	return os.WriteFile(metaPath(targetPath), []byte(meta), 0600)
 }
 
 func metaPath(targetPath string) string {
