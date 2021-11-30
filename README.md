@@ -10,8 +10,10 @@ The SPIFFE Workload API is nominally served over a Unix domain socket. Some
 SPIFFE implementations (e.g. SPIRE) rely on DaemonSets to run one Workload API
 server instance per host. In these cases, it is necessary to inject the
 Workload API socket into each pod. The primary motivation for using a CSI
-driver for this purpose is to avoid the use of hostPath, which is associated
-with security weaknesses and is commonly disallowed by policy.
+driver for this purpose is to avoid the use of [hostPath](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath) volumes in workload containers,
+which is associated with security weaknesses and is commonly disallowed by
+policy. Note that `hostPath` volumes are still required for the CSI driver to
+interact with the [Kubelet](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/) (see [Limitations](#limitations)).
 
 This driver provides pods with an ephemeral inline volume. SPIFFE
 implementations can serve their Workload API socket in a central location, and
@@ -32,6 +34,17 @@ at the requested target path.
 
 Similarly, when the pod is destroyed, the driver is invoked and removes the
 bind mount.
+
+## Dependencies
+
+CSI Ephemeral Inline Volumes require at least Kubernetes 1.15 (enabled via the
+`CSIInlineVolume` feature gate) or 1.16 (enabled by default).
+
+## Limitations
+
+CSI drivers are registered as plugins and otherwise interact with the Kubelet,
+which requires several `hostPath` volumes. As such, this driver cannot be used
+in environments where `hostPath` volumes are forbidden.
 
 ## Example
 
@@ -64,6 +77,7 @@ unmounting will eventually succeed and the pod will be fully terminated.
 
 ## Reporting a Vulnerability
 
-If you've found a vulnerability please let us know at security@spiffe.io. We'll
-send a confirmation email both to acknowledge the report, and additionally when
-we've identified the issue positively or negatively.
+Vulnerabilities can be reported by sending an email to security@spiffe.io. A
+confirmation email will be sent to acknowledge the report within 72 hours. A
+second acknowledgement will be sent within 7 days when the vulnerability has
+been positively or negatively confirmed.
