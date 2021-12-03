@@ -97,7 +97,7 @@ apply-yaml() {
 }
 
 register-workload() {
-    "${KUBECTL}" exec -it \
+    "${KUBECTL}" exec \
         -nspire-system \
         deployment/spire-server -- \
         /opt/spire/bin/spire-server entry create \
@@ -105,7 +105,7 @@ register-workload() {
             -spiffeID spiffe://test/node \
             -selector k8s_psat:cluster:test
 
-    "${KUBECTL}" exec -it \
+    "${KUBECTL}" exec \
         -nspire-system \
         deployment/spire-server -- \
         /opt/spire/bin/spire-server entry create \
@@ -122,7 +122,7 @@ check-workload-status() {
     echo -n "Checking Workload API update status on $_which."
     for ((i=1;i<=_numchecks;i++)); do
         echo -n "."
-        _status=$(kubectl exec -it "deployment/$_which" -- /bin/cat status | tr -d '[:space:]')
+        _status=$("${KUBECTL}" exec "deployment/$_which" -- /bin/cat status | tr -d '[:space:]')
         if [ "${_status}" == "updated" ]; then
             echo "ok."
             return 0
