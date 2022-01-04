@@ -179,10 +179,17 @@ spec:
               path: spire-agent
               expirationSeconds: 7200
               audience: spire-server
-        # This volume is used to share the workload api socket between the
-        # CSI driver and SPIRE agent
+        # This volume is used to share the Workload API socket between the CSI
+        # driver and SPIRE agent. Note, an emptyDir volume could also be used,
+        # however, this can lead to broken bind mounts in the workload
+        # containers if the agent pod is restarted (since the emptyDir
+        # directory on the node that was mounted into workload containers by
+        # the CSI driver belongs to the old pod instance and is no longer
+        # valid).
         - name: spire-agent-socket-dir
-          emptyDir: {}
+          hostPath:
+            path: /run/spire/agent-sockets
+            type: DirectoryOrCreate
         # This volume is where the socket for kubelet->driver communication lives
         - name: spiffe-csi-socket-dir
           hostPath:
