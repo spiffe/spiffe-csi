@@ -66,7 +66,7 @@ download-kind() {
 
 create-cluster() {
     echo "Creating cluster..."
-    "${KIND}" create cluster
+    "${KIND}" create cluster --config "${DIR}/config/cluster.yaml"
     echo "Cluster created."
 }
 

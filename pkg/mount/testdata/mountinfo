@@ -1,0 +1,28 @@
+1276 805 0:283 / / rw,relatime - overlay overlay rw,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/152/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/63/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/182/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/182/work
+1277 1276 0:285 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
+1278 1276 0:291 / /dev rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755
+1279 1278 0:292 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
+1280 1278 0:255 / /dev/mqueue rw,nosuid,nodev,noexec,relatime - mqueue mqueue rw
+1281 1276 0:149 / /sys rw,nosuid,nodev,noexec,relatime - sysfs sysfs ro
+1282 1281 0:30 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw
+1283 1276 254:1 /docker/volumes/ae14d1dc9612d7d30d542a76b17f1a4df12a2167161454111652d5b863be332c/_data/spire-agent-socket-dir /spire-agent-socket ro,relatime - ext4 /dev/vda1 rw
+1291 1276 254:1 /docker/volumes/ae14d1dc9612d7d30d542a76b17f1a4df12a2167161454111652d5b863be332c/_data/lib/kubelet/plugins/csi.spiffe.io /spiffe-csi rw,relatime - ext4 /dev/vda1 rw
+1292 1278 0:251 / /dev/shm rw,nosuid,nodev,noexec,relatime - tmpfs shm rw,size=65536k
+1293 1276 254:1 /docker/volumes/ae14d1dc9612d7d30d542a76b17f1a4df12a2167161454111652d5b863be332c/_data/lib/kubelet/pods/ba1f3cb7-6de1-4e68-90c3-a17b49c609de/etc-hosts /etc/hosts rw,relatime - ext4 /dev/vda1 rw
+1294 1278 254:1 /docker/volumes/ae14d1dc9612d7d30d542a76b17f1a4df12a2167161454111652d5b863be332c/_data/lib/kubelet/pods/ba1f3cb7-6de1-4e68-90c3-a17b49c609de/containers/spiffe-csi-driver/6d7a662e /dev/termination-log rw,relatime - ext4 /dev/vda1 rw
+1295 1276 254:1 /docker/volumes/ae14d1dc9612d7d30d542a76b17f1a4df12a2167161454111652d5b863be332c/_data/lib/containerd/io.containerd.grpc.v1.cri/sandboxes/817b61a8b634da271000f1bf70e2147c4584a4e8fe8161e5904b900c0a8c8588/hostname /etc/hostname rw,relatime - ext4 /dev/vda1 rw
+1296 1276 254:1 /docker/volumes/ae14d1dc9612d7d30d542a76b17f1a4df12a2167161454111652d5b863be332c/_data/lib/containerd/io.containerd.grpc.v1.cri/sandboxes/817b61a8b634da271000f1bf70e2147c4584a4e8fe8161e5904b900c0a8c8588/resolv.conf /etc/resolv.conf rw,relatime - ext4 /dev/vda1 rw
+1297 1276 254:1 /docker/volumes/ae14d1dc9612d7d30d542a76b17f1a4df12a2167161454111652d5b863be332c/_data/lib/kubelet/pods /var/lib/kubelet/pods rw,relatime shared:195 master:28 - ext4 /dev/vda1 rw
+1298 1297 0:252 / /var/lib/kubelet/pods/f29021da-ea07-4828-adec-cd70cb9435f6/volumes/kubernetes.io~projected/kube-api-access-p4vl5 rw,relatime shared:229 - tmpfs tmpfs rw
+1299 1297 0:258 / /var/lib/kubelet/pods/8d5455fe-90e2-43b2-b9b4-fc6a79f1745f/volumes/kubernetes.io~projected/kube-api-access-cdcnf rw,relatime shared:232 - tmpfs tmpfs rw
+1300 1297 0:295 / /var/lib/kubelet/pods/d1fc398a-15ab-4109-817a-601a4b7932a2/volumes/kubernetes.io~projected/kube-api-access-gbk8v rw,relatime shared:240 - tmpfs tmpfs rw
+1301 1297 0:314 / /var/lib/kubelet/pods/7cc4af94-fd10-4ad4-b17e-46cb7b1f3fc8/volumes/kubernetes.io~projected/kube-api-access-lzlz9 rw,relatime shared:244 - tmpfs tmpfs rw
+1302 1297 0:338 / /var/lib/kubelet/pods/85e8c8e6-c4ad-4dd3-b820-06520b58367b/volumes/kubernetes.io~projected/kube-api-access-pjpfr rw,relatime shared:251 - tmpfs tmpfs rw
+1303 1297 0:223 / /var/lib/kubelet/pods/5a888803-bf74-4958-ba18-a1c08cac1d24/volumes/kubernetes.io~projected/kube-api-access-vcwdd rw,relatime shared:219 - tmpfs tmpfs rw
+1304 1297 0:237 / /var/lib/kubelet/pods/c3a32fc0-f186-4974-8579-429dea58ec6d/volumes/kubernetes.io~projected/kube-api-access-56mpv rw,relatime shared:224 - tmpfs tmpfs rw
+1305 1297 0:248 / /var/lib/kubelet/pods/72e3589e-908c-476f-9f95-2b1884552d1c/volumes/kubernetes.io~projected/kube-api-access-9vsww rw,relatime shared:225 - tmpfs tmpfs rw
+1306 1297 254:1 /docker/volumes/ae14d1dc9612d7d30d542a76b17f1a4df12a2167161454111652d5b863be332c/_data/spire-agent-socket-dir /var/lib/kubelet/pods/c3a32fc0-f186-4974-8579-429dea58ec6d/volumes/kubernetes.io~csi/spire-agent-socket/mount ro,relatime shared:257 - ext4 /dev/vda1 rw
+1307 1297 254:1 /docker/volumes/ae14d1dc9612d7d30d542a76b17f1a4df12a2167161454111652d5b863be332c/_data/spire-agent-socket-dir /var/lib/kubelet/pods/72e3589e-908c-476f-9f95-2b1884552d1c/volumes/kubernetes.io~csi/spire-agent-socket/mount ro,relatime shared:258 - ext4 /dev/vda1 rw
+1308 1297 0:249 / /var/lib/kubelet/pods/ba1f3cb7-6de1-4e68-90c3-a17b49c609de/volumes/kubernetes.io~projected/spire-token rw,relatime shared:227 - tmpfs tmpfs rw
+1309 1297 0:250 / /var/lib/kubelet/pods/ba1f3cb7-6de1-4e68-90c3-a17b49c609de/volumes/kubernetes.io~projected/kube-api-access-mkgzr rw,relatime shared:228 - tmpfs tmpfs rw
+1310 1276 0:250 / /run/secrets/kubernetes.io/serviceaccount ro,relatime - tmpfs tmpfs rw

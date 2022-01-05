@@ -14,3 +14,7 @@ func bindMountRO(src, dst string) error {
 func unmount(path string) error {
 	return errors.New("unsupported on this platform")
 }
+
+func isMountPoint(mountPoint string) (bool, error) {
+	return false, errors.New("unsupported on this platform")
+}
