@@ -18,7 +18,7 @@ const (
 
 var (
 	// procMountInfo is the path the mount information presented by the proc
-	// filesystem for the current process. It is overriden in unit tests to
+	// filesystem for the current process. It is overridden in unit tests to
 	// test the parsing.
 	procMountInfo = "/proc/self/mountinfo"
 )
