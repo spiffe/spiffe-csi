@@ -25,10 +25,13 @@ workload pods.
 ## How it Works
 
 This component is generally deployed as a container in the DaemonSet that
-provides the Workload API implementation (e.g SPIRE agent) and registered
-with the kubelet using the official CSI Node Driver Registrar image. The
-SPIFFE CSI Driver and the Workload API implementation share the directory
-hosting the Workload API Unix Domain Socket using an `emptyDir` mount.
+provides the Workload API implementation (e.g SPIRE agent) and registered with
+the kubelet using the official CSI Node Driver Registrar image. The SPIFFE CSI
+Driver and the Workload API implementation share the directory hosting the
+Workload API Unix Domain Socket using an `hostPath` volume. An `emptyDir`
+volume cannot be used since the backing directory would be removed if the
+SPIFFE CSI Driver pod is restarted, invalidating the mount into workload
+containers.
 
 When pods declare an ephemeral inline mount using this driver, the driver is
 invoked to mount the volume. The driver does a read-only bind mount of the
@@ -65,7 +68,7 @@ the driver registrar container, and the SPIFFE CSI driver container. Likely
 suspects are a misconfiguratoin of the various volume mounts needed for
 communication between the register, the SPIFFE CSI driver, and the kubelet.
 
-### Failure to mount the socket directory
+### Failure to Mount the Socket Directory
 
 This problem can be diagnosed by dumping the SPIFFE CSI driver logs.
 
@@ -77,6 +80,12 @@ driver health is restored. The describe command (i.e. kubectl describe) will
 show the failure to unmount the volume. Kubernetes will continue to retry to
 unmount the volume via the CSI driver. Once the driver has been restored, the
 unmounting will eventually succeed and the pod will be fully terminated.
+
+### Broken Mount when the CSI Driver Pod is Restarted
+
+Ensure that the Workload API socket directory is shared with the SPIFFE CSI
+Driver via a `hostPath` volume. The directory backing `emptyDir` volumes are
+tied to the pod instance and invalidated when the pod is restarted.
 
 ## Reporting a Vulnerability
 
