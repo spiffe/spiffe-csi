@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
@@ -420,7 +421,10 @@ func startDriver(t *testing.T) (client, string) {
 		errCh <- s.Serve(l) // failures to serve will
 	}()
 	go func() {
-		conn, err := grpc.DialContext(ctx, l.Addr().String(), grpc.WithInsecure(), grpc.FailOnNonTempDialError(true), grpc.WithReturnConnectionError())
+		conn, err := grpc.DialContext(ctx, l.Addr().String(),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.FailOnNonTempDialError(true),
+			grpc.WithReturnConnectionError())
 		if err != nil {
 			errCh <- err
 		} else {
