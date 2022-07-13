@@ -9,7 +9,7 @@ require (
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
-	google.golang.org/grpc v1.47.0
+	google.golang.org/grpc v1.48.0
 )
 
 require (
