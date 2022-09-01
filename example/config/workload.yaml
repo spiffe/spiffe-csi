@@ -18,3 +18,4 @@ spec:
   - name: spiffe-workload-api
     csi:
       driver: "csi.spiffe.io"
+      readOnly: true

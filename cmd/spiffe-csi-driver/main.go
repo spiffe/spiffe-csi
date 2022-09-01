@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	nodeIDFlag           = flag.String("node-id", "", "Kubernetes Node ID. If unset, the node ID is obtained from the environment (i.e., -node-id-env)")
-	nodeIDEnvFlag        = flag.String("node-id-env", "MY_NODE_NAME", "Envvar from which to obtain the node ID. Overridden by -node-id.")
-	csiSocketPathFlag    = flag.String("csi-socket-path", "/spiffe-csi/csi.sock", "Path to the CSI socket")
-	workloadAPISocketDir = flag.String("workload-api-socket-dir", "", "Path to the Workload API socket directory")
+	enforceReadOnlyVolumeFlag = flag.Bool("enforce-read-only-volume", false, "If set, enforce that the CSI volume is marked read-only")
+	nodeIDFlag                = flag.String("node-id", "", "Kubernetes Node ID. If unset, the node ID is obtained from the environment (i.e., -node-id-env)")
+	nodeIDEnvFlag             = flag.String("node-id-env", "MY_NODE_NAME", "Envvar from which to obtain the node ID. Overridden by -node-id.")
+	csiSocketPathFlag         = flag.String("csi-socket-path", "/spiffe-csi/csi.sock", "Path to the CSI socket")
+	workloadAPISocketDirFlag  = flag.String("workload-api-socket-dir", "", "Path to the Workload API socket directory")
 )
 
 func main() {
@@ -39,19 +40,32 @@ func main() {
 	}
 	log = zapr.NewLogger(zapLog)
 
+	// If the enforce-read-only-volume flag was not explicitly provided,
+	// instruct the user to set it. Either way, if it is set to false, or
+	// unset, emit a log educating users that the will be enforced in the
+	// future.
+	// TODO: enforce this by default in a future release.
+	if !isFlagSet("enforce-read-only-volume") {
+		log.Error(nil, "Pass the --enforce-read-only-volume flag to enforce that the CSI volume is marked read-only")
+	}
+	if !*enforceReadOnlyVolumeFlag {
+		log.Error(nil, "Not enforcing that the CSI volume is marked read-only; this will be required in a future release")
+	}
+
 	nodeID := getNodeIDFromFlags()
 
 	log.Info("Starting.",
 		logkeys.Version, version.Version(),
 		logkeys.NodeID, nodeID,
-		logkeys.WorkloadAPISocketDir, *workloadAPISocketDir,
+		logkeys.WorkloadAPISocketDir, *workloadAPISocketDirFlag,
 		logkeys.CSISocketPath, *csiSocketPathFlag,
+		logkeys.EnforceReadOnlyVolume, *enforceReadOnlyVolumeFlag,
 	)
 
 	driver, err := driver.New(driver.Config{
 		Log:                  log,
 		NodeID:               nodeID,
-		WorkloadAPISocketDir: *workloadAPISocketDir,
+		WorkloadAPISocketDir: *workloadAPISocketDirFlag,
 	})
 	if err != nil {
 		log.Error(err, "Failed to create driver")
@@ -77,4 +91,14 @@ func getNodeIDFromFlags() string {
 		nodeID = *nodeIDFlag
 	}
 	return nodeID
+}
+
+func isFlagSet(name string) bool {
+	set := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
 }

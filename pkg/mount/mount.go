@@ -5,6 +5,11 @@ func BindMountRO(root, mountPoint string) error {
 	return bindMountRO(root, mountPoint)
 }
 
+// BindMountRW performs a read-write bind mount from root to mountPoint
+func BindMountRW(root, mountPoint string) error {
+	return bindMountRW(root, mountPoint)
+}
+
 // Unmount unmounts a mount
 func Unmount(mountPoint string) error {
 	return unmount(mountPoint)

@@ -31,3 +31,6 @@ spec:
       - name: spire-agent-socket
         csi:
           driver: "csi.spiffe.io"
+          # Don't set the readOnly attribute since we need to ensure existing
+          # deployments work.
+          # TODO: set readOnly once we enforce it

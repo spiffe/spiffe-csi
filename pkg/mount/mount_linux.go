@@ -27,6 +27,10 @@ func bindMountRO(root, mountPoint string) error {
 	return unix.Mount(root, mountPoint, "none", msBind|msRdOnly, "")
 }
 
+func bindMountRW(root, mountPoint string) error {
+	return unix.Mount(root, mountPoint, "none", msBind, "")
+}
+
 func unmount(mountPoint string) error {
 	return unix.Unmount(mountPoint, 0)
 }
