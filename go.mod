@@ -1,6 +1,6 @@
 module github.com/spiffe/spiffe-csi
 
-go 1.17
+go 1.19
 
 require (
 	github.com/container-storage-interface/spec v1.6.0
