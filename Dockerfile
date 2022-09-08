@@ -1,5 +1,5 @@
 # Build the SPIFFE CSI Driver binary
-FROM golang:1.17.1-alpine AS builder
+FROM golang:1.19.1-alpine AS builder
 ARG GIT_TAG
 ARG GIT_COMMIT
 ARG GIT_DIRTY
