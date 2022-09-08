@@ -22,15 +22,17 @@ const (
 var (
 	// We replace these in tests since bind mounting generally requires root.
 	bindMountRO  = mount.BindMountRO
+	bindMountRW  = mount.BindMountRW
 	unmount      = mount.Unmount
 	isMountPoint = mount.IsMountPoint
 )
 
 // Config is the configuration for the driver
 type Config struct {
-	Log                  logr.Logger
-	NodeID               string
-	WorkloadAPISocketDir string
+	Log                   logr.Logger
+	NodeID                string
+	WorkloadAPISocketDir  string
+	EnforceReadOnlyVolume bool
 }
 
 // Driver is the ephemeral-inline CSI driver implementation
@@ -38,9 +40,10 @@ type Driver struct {
 	csi.UnimplementedIdentityServer
 	csi.UnimplementedNodeServer
 
-	log                  logr.Logger
-	nodeID               string
-	workloadAPISocketDir string
+	log                   logr.Logger
+	nodeID                string
+	workloadAPISocketDir  string
+	enforceReadOnlyVolume bool
 }
 
 // New creates a new driver with the given config
@@ -52,9 +55,10 @@ func New(config Config) (*Driver, error) {
 		return nil, errors.New("workload API socket directory is required")
 	}
 	return &Driver{
-		log:                  config.Log,
-		nodeID:               config.NodeID,
-		workloadAPISocketDir: config.WorkloadAPISocketDir,
+		log:                   config.Log,
+		nodeID:                config.NodeID,
+		workloadAPISocketDir:  config.WorkloadAPISocketDir,
+		enforceReadOnlyVolume: config.EnforceReadOnlyVolume,
 	}, nil
 }
 
@@ -115,6 +119,8 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 		return nil, status.Error(codes.InvalidArgument, "request missing required volume capability access mode")
 	case isVolumeCapabilityAccessModeReadOnly(req.VolumeCapability.AccessMode):
 		return nil, status.Error(codes.InvalidArgument, "request volume capability access mode is not valid")
+	case d.enforceReadOnlyVolume && !req.Readonly:
+		return nil, status.Error(codes.InvalidArgument, "pod.spec.volumes[].csi.readOnly must be set to 'true'")
 	case ephemeralMode != "true":
 		return nil, status.Error(codes.InvalidArgument, "only ephemeral volumes are supported")
 	}
@@ -123,9 +129,25 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	if err := os.Mkdir(req.TargetPath, 0777); err != nil && !os.IsExist(err) {
 		return nil, status.Errorf(codes.Internal, "unable to create target path %q: %v", req.TargetPath, err)
 	}
-	// Bind mount the agent socket directory (read only) to the target path
-	if err := bindMountRO(d.workloadAPISocketDir, req.TargetPath); err != nil {
-		return nil, status.Errorf(codes.Internal, "unable to mount %q: %v", req.TargetPath, err)
+
+	// Ideally the volume is writable by the host to enable, for example,
+	// manipulation of file attributes by SELinux. However, the volume MUST NOT
+	// be writable by workload containers.
+	//
+	// Therefore, if the volume is marked read-only, thus ensuring that the
+	// kubelet will mount it read-only into the workload container, bind mount
+	// the agent socket directory read-write to the target path on the host.
+	//
+	// If the volume is not marked read-only, then do a read-only mount to
+	// prevent the directory from being manipulated by the workload container.
+	if req.Readonly {
+		if err := bindMountRW(d.workloadAPISocketDir, req.TargetPath); err != nil {
+			return nil, status.Errorf(codes.Internal, "unable to mount %q read-write: %v", req.TargetPath, err)
+		}
+	} else {
+		if err := bindMountRO(d.workloadAPISocketDir, req.TargetPath); err != nil {
+			return nil, status.Errorf(codes.Internal, "unable to mount %q read-only: %v", req.TargetPath, err)
+		}
 	}
 
 	log.Info("Volume published")

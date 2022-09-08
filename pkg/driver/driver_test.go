@@ -29,7 +29,10 @@ const (
 
 func init() {
 	bindMountRO = func(src, dst string) error {
-		return writeMeta(dst, src)
+		return writeMeta(dst, src+",ro")
+	}
+	bindMountRW = func(src, dst string) error {
+		return writeMeta(dst, src+",rw")
 	}
 	unmount = func(dst string) error {
 		return os.Remove(metaPath(dst))
@@ -120,14 +123,13 @@ func TestBoilerplateRPCs(t *testing.T) {
 }
 
 func TestNodePublishVolume(t *testing.T) {
-	client, workloadAPISocketDir := startDriver(t)
-
 	for _, tt := range []struct {
-		desc            string
-		mutateReq       func(req *csi.NodePublishVolumeRequest)
-		mungeTargetPath func(t *testing.T, targetPath string)
-		expectCode      codes.Code
-		expectMsgPrefix string
+		desc                  string
+		mutateReq             func(req *csi.NodePublishVolumeRequest)
+		mungeTargetPath       func(t *testing.T, targetPath string)
+		enforceReadOnlyVolume bool
+		expectCode            codes.Code
+		expectMsgPrefix       string
 	}{
 		{
 			desc: "missing volume id",
@@ -247,6 +249,23 @@ func TestNodePublishVolume(t *testing.T) {
 			expectMsgPrefix: "unable to mount",
 		},
 		{
+			desc: "not enforcing read-only",
+			mutateReq: func(req *csi.NodePublishVolumeRequest) {
+				req.Readonly = false
+			},
+			expectCode: codes.OK,
+		},
+		{
+			desc: "enforcing read-only",
+			mutateReq: func(req *csi.NodePublishVolumeRequest) {
+				req.Readonly = false
+			},
+			enforceReadOnlyVolume: true,
+			expectCode:            codes.InvalidArgument,
+			expectMsgPrefix:       "pod.spec.volumes[].csi.readOnly must be set to 'true'",
+		},
+
+		{
 			desc:       "success",
 			expectCode: codes.OK,
 		},
@@ -262,6 +281,7 @@ func TestNodePublishVolume(t *testing.T) {
 			req := &csi.NodePublishVolumeRequest{
 				VolumeId:   "volumeID",
 				TargetPath: targetPath,
+				Readonly:   true,
 				VolumeCapability: &csi.VolumeCapability{
 					AccessType: &csi.VolumeCapability_Mount{},
 					AccessMode: &csi.VolumeCapability_AccessMode{},
@@ -273,11 +293,14 @@ func TestNodePublishVolume(t *testing.T) {
 			if tt.mutateReq != nil {
 				tt.mutateReq(req)
 			}
+
+			client, workloadAPISocketDir := startDriver(t, enforceReadOnlyVolume(tt.enforceReadOnlyVolume))
+
 			resp, err := client.NodePublishVolume(context.Background(), req)
 			requireGRPCStatusPrefix(t, err, tt.expectCode, tt.expectMsgPrefix)
 			if err == nil {
 				assert.Equal(t, &csi.NodePublishVolumeResponse{}, resp)
-				assertMounted(t, targetPath, workloadAPISocketDir)
+				assertMounted(t, targetPath, workloadAPISocketDir, req.Readonly)
 			} else {
 				assert.Nil(t, resp)
 				assertNotMounted(t, targetPath)
@@ -392,14 +415,26 @@ type client struct {
 	csi.NodeClient
 }
 
-func startDriver(t *testing.T) (client, string) {
+func enforceReadOnlyVolume(value bool) func(*Config) {
+	return func(c *Config) {
+		c.EnforceReadOnlyVolume = value
+	}
+}
+
+func startDriver(t *testing.T, opts ...func(*Config)) (client, string) {
 	workloadAPISocketDir := t.TempDir()
 
-	d, err := New(Config{
+	config := Config{
 		Log:                  logr.Discard(),
 		NodeID:               testNodeID,
 		WorkloadAPISocketDir: workloadAPISocketDir,
-	})
+	}
+
+	for _, opt := range opts {
+		opt(&config)
+	}
+
+	d, err := New(config)
 	require.NoError(t, err)
 
 	l, err := net.Listen("tcp", "localhost:0")
@@ -446,11 +481,16 @@ func startDriver(t *testing.T) (client, string) {
 	}, workloadAPISocketDir
 }
 
-func assertMounted(t *testing.T, targetPath, src string) {
+func assertMounted(t *testing.T, targetPath, src string, readOnly bool) {
 	meta, err := readMeta(targetPath)
 	if assert.NoError(t, err) {
-		// assert the src
-		assert.Equal(t, src, meta)
+		// Counterintuitively, we expect the driver to mount R/W when the
+		// volume is marked read-only. See the note in driver.go for details.
+		if readOnly {
+			assert.Equal(t, src+",rw", meta)
+		} else {
+			assert.Equal(t, src+",ro", meta)
+		}
 	}
 }
 
