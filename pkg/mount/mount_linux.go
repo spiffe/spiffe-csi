@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	msRdOnly uintptr = 1    // LINUX MS_RDONLY
-	msBind   uintptr = 4096 // LINUX MS_BIND
+	msBind uintptr = 4096 // LINUX MS_BIND
 )
 
 var (
@@ -22,10 +21,6 @@ var (
 	// test the parsing.
 	procMountInfo = "/proc/self/mountinfo"
 )
-
-func bindMountRO(root, mountPoint string) error {
-	return unix.Mount(root, mountPoint, "none", msBind|msRdOnly, "")
-}
 
 func bindMountRW(root, mountPoint string) error {
 	return unix.Mount(root, mountPoint, "none", msBind, "")
