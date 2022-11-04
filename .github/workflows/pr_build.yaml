@@ -34,10 +34,5 @@ jobs:
         uses: actions/checkout@v3
       - name: Build image
         run: make docker-build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Build image
-        run: make docker-build
       - name: Run integration tests
         run: K8S_VERSION=${{ matrix.k8s-version }} test/run.sh
