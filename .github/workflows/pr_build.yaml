@@ -36,3 +36,9 @@ jobs:
         run: make docker-build
       - name: Run integration tests
         run: K8S_VERSION=${{ matrix.k8s-version }} test/run.sh
+  success:
+    needs: [lint, build-and-test-images]
+    runs-on: ubuntu-latest
+    steps:
+        - name: Declare victory!
+          run: echo "Success!"
