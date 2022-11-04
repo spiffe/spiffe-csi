@@ -5,8 +5,17 @@ set -e -o pipefail
 DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Versions under test
-KIND_VERSION=${KIND_VERSION:-v0.11.1}
-KUBECTL_VERSION=${KUBECTL_VERSION:-v1.22.4}
+KIND_VERSION=${KIND_VERSION:-v0.17.0}
+KUBECTL_VERSION=${KUBECTL_VERSION:-v1.25.3}
+
+# e.g. K8S_VERSION=v1.22.4
+# https://hub.docker.com/r/kindest/node/tags
+if test -n "$K8S_VERSION"; then
+    KIND_NODE="--image=kindest/node:$K8S_VERSION"
+else
+    # Just use the default.
+    KIND_NODE=""
+fi
 
 # Export the Kind cluster name so we don't have to specify it on every kind
 # invocation
@@ -66,8 +75,9 @@ download-kind() {
 
 create-cluster() {
     echo "Creating cluster..."
-    "${KIND}" create cluster --config "${DIR}/config/cluster.yaml"
+    "${KIND}" create cluster $KIND_NODE --config "${DIR}/config/cluster.yaml"
     echo "Cluster created."
+    "${KUBECTL}" version
 }
 
 delete-cluster() {
