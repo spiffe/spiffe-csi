@@ -1,8 +1,8 @@
 package mount
 
-// BindMountRO performs a read-only bind mount from root to mountPoint
-func BindMountRO(root, mountPoint string) error {
-	return bindMountRO(root, mountPoint)
+// BindMountRW performs a read-write bind mount from root to mountPoint
+func BindMountRW(root, mountPoint string) error {
+	return bindMountRW(root, mountPoint)
 }
 
 // Unmount unmounts a mount

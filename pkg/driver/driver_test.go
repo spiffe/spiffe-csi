@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
@@ -27,7 +28,7 @@ const (
 )
 
 func init() {
-	bindMountRO = func(src, dst string) error {
+	bindMountRW = func(src, dst string) error {
 		return writeMeta(dst, src)
 	}
 	unmount = func(dst string) error {
@@ -119,8 +120,6 @@ func TestBoilerplateRPCs(t *testing.T) {
 }
 
 func TestNodePublishVolume(t *testing.T) {
-	client, workloadAPISocketDir := startDriver(t)
-
 	for _, tt := range []struct {
 		desc            string
 		mutateReq       func(req *csi.NodePublishVolumeRequest)
@@ -246,6 +245,14 @@ func TestNodePublishVolume(t *testing.T) {
 			expectMsgPrefix: "unable to mount",
 		},
 		{
+			desc: "enforcing read-only volumes",
+			mutateReq: func(req *csi.NodePublishVolumeRequest) {
+				req.Readonly = false
+			},
+			expectCode:      codes.InvalidArgument,
+			expectMsgPrefix: "pod.spec.volumes[].csi.readOnly must be set to 'true'",
+		},
+		{
 			desc:       "success",
 			expectCode: codes.OK,
 		},
@@ -261,6 +268,7 @@ func TestNodePublishVolume(t *testing.T) {
 			req := &csi.NodePublishVolumeRequest{
 				VolumeId:   "volumeID",
 				TargetPath: targetPath,
+				Readonly:   true,
 				VolumeCapability: &csi.VolumeCapability{
 					AccessType: &csi.VolumeCapability_Mount{},
 					AccessMode: &csi.VolumeCapability_AccessMode{},
@@ -272,6 +280,9 @@ func TestNodePublishVolume(t *testing.T) {
 			if tt.mutateReq != nil {
 				tt.mutateReq(req)
 			}
+
+			client, workloadAPISocketDir := startDriver(t)
+
 			resp, err := client.NodePublishVolume(context.Background(), req)
 			requireGRPCStatusPrefix(t, err, tt.expectCode, tt.expectMsgPrefix)
 			if err == nil {
@@ -420,7 +431,10 @@ func startDriver(t *testing.T) (client, string) {
 		errCh <- s.Serve(l) // failures to serve will
 	}()
 	go func() {
-		conn, err := grpc.DialContext(ctx, l.Addr().String(), grpc.WithInsecure(), grpc.FailOnNonTempDialError(true), grpc.WithReturnConnectionError())
+		conn, err := grpc.DialContext(ctx, l.Addr().String(),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.FailOnNonTempDialError(true),
+			grpc.WithReturnConnectionError())
 		if err != nil {
 			errCh <- err
 		} else {
@@ -445,7 +459,6 @@ func startDriver(t *testing.T) (client, string) {
 func assertMounted(t *testing.T, targetPath, src string) {
 	meta, err := readMeta(targetPath)
 	if assert.NoError(t, err) {
-		// assert the src
 		assert.Equal(t, src, meta)
 	}
 }
