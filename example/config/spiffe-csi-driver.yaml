@@ -29,9 +29,8 @@ spec:
     spec:
       serviceAccountName: spiffe-csi-driver
       containers:
-        # This is the container which runs the SPIFFE CSI driver.
         - name: spiffe-csi-driver
-          image: ghcr.io/spiffe/spiffe-csi-driver:nightly
+          image: ghcr.io/spiffe/spiffe-csi-driver:0.2.0
           imagePullPolicy: IfNotPresent
           args: [
             "-workload-api-socket-dir", "/spire-agent-socket",
@@ -68,7 +67,7 @@ spec:
         # of all the little details required to register a CSI driver with
         # the kubelet.
         - name: node-driver-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v2.0.1
+          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.6.0
           imagePullPolicy: IfNotPresent
           args: [
             "-csi-address", "/spiffe-csi/csi.sock",
@@ -84,8 +83,9 @@ spec:
               mountPath: /registration
       volumes:
         # This volume is used to share the Workload API socket between the CSI
-        # driver and SPIRE agent. Note, an emptyDir volume could also be used,
-        # however, this can lead to broken bind mounts in the workload
+        # driver and SPIRE agent. Note, an emptyDir volume could also be used
+        # (if the CSI driver and SPIRE agent shared a pod), however,
+        # this can lead to broken bind mounts in the workload
         # containers if the agent pod is restarted (since the emptyDir
         # directory on the node that was mounted into workload containers by
         # the CSI driver belongs to the old pod instance and is no longer
