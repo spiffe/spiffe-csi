@@ -1,5 +1,3 @@
----
-
 # Source: spire-agent/templates/csi-serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
