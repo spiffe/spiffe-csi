@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1] - 2022-11-07
+
+### Changed
+
+- Updated dependencies to quell false positive vulnerability reports (#58)
+
 ## [0.2.0] - 2022-09-08
 
 ### Changed
