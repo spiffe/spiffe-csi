@@ -28,6 +28,7 @@ spec:
       serviceAccountName: spiffe-csi-driver
       containers:
         - name: spiffe-csi-driver
+          # This is the container which runs the SPIFFE CSI driver.
           image: ghcr.io/spiffe/spiffe-csi-driver:0.2.0
           imagePullPolicy: IfNotPresent
           args: [
