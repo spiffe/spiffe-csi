@@ -72,6 +72,10 @@ docker-build:
 build: | bin
 	CGO_ENABLED=0 go build -ldflags ${go_ldflags} -o bin/spiffe-csi-driver ./cmd/spiffe-csi-driver
 
+.PHONY: test
+test:
+	go test ./...
+
 bin:
 	mkdir bin
 
