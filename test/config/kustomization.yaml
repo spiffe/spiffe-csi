@@ -1,6 +1,6 @@
 resources:
-- spiffe-csi-driver.yaml
 - spire-namespace.yaml
+- spiffe-csi-driver.yaml
 - spire-server.yaml
 - spire-agent.yaml
 - spiffe-csi-test-workload-1.yaml

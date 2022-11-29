@@ -155,5 +155,5 @@ apply-yaml
 register-workload
 check-workload-status "test-workload-1"
 check-workload-status "test-workload-2"
-"${KUBECTL}" logs -nspire-system daemonset/spire-agent -c spiffe-csi-driver
+"${KUBECTL}" logs -nspire-system daemonset/spiffe-csi-driver -c spiffe-csi-driver
 echo "Done."
