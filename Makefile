@@ -28,6 +28,8 @@ endif
 # Vars
 ############################################################################
 
+BINARIES := spiffe-csi-driver
+
 PLATFORMS ?= linux/amd64,linux/arm64
 
 build_dir := $(DIR)/.build/$(os1)-$(arch1)
@@ -67,7 +69,7 @@ container-builder:
 	docker buildx create --platform $(PLATFORMS) --name container-builder --node container-builder0 --use
 
 .PHONY: docker-build
-docker-build: spiffe-csi-driver-image.tar
+docker-build: $(addsuffix -image.tar,$(BINARIES))
 
 spiffe-csi-driver-image.tar: Dockerfile FORCE | container-builder
 	docker buildx build \
@@ -80,15 +82,14 @@ spiffe-csi-driver-image.tar: Dockerfile FORCE | container-builder
 		.
 
 .PHONY: build
-build: | bin
-	CGO_ENABLED=0 go build -ldflags '$(go_ldflags)' -o bin/spiffe-csi-driver ./cmd/spiffe-csi-driver
+build: $(addprefix bin/,$(BINARIES))
+
+bin/%: cmd/% FORCE
+	CGO_ENABLED=0 go build -ldflags '$(go_ldflags)' -o $@ ./$<
 
 .PHONY: test
 test:
 	go test ./...
-
-bin:
-	mkdir bin
 
 .PHONY: lint
 lint: $(golangci_lint_bin)
@@ -102,5 +103,5 @@ $(golangci_lint_bin):
 	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(golangci_lint_dir) $(golangci_lint_version)
 
 .PHONY: load-images
-load-images: spiffe-csi-driver-image.tar
+load-images: $(addsuffix -image.tar,$(BINARIES))
 	./.github/workflows/scripts/load-oci-archives.sh
