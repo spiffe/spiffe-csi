@@ -4,7 +4,7 @@ on:
   workflow_dispatch: {}
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -15,7 +15,7 @@ jobs:
       - name: Lint
         run: make lint
   build-and-test-images:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -38,7 +38,7 @@ jobs:
         run: K8S_VERSION=${{ matrix.k8s-version }} test/run.sh
   success:
     needs: [lint, build-and-test-images]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
         - name: Declare victory!
           run: echo "Success!"
