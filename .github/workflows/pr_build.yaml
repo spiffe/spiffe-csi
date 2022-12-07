@@ -2,8 +2,9 @@ name: PR Build
 on:
   pull_request: {}
   workflow_dispatch: {}
+
 jobs:
-  lint:
+  validate:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -14,6 +15,9 @@ jobs:
           go-version: 1.19.3
       - name: Lint
         run: make lint
+      - name: Test
+        run: make test
+
   build-and-test-images:
     runs-on: ubuntu-22.04
     strategy:
@@ -36,9 +40,11 @@ jobs:
         run: make docker-build
       - name: Run integration tests
         run: K8S_VERSION=${{ matrix.k8s-version }} test/run.sh
+
   success:
-    needs: [lint, build-and-test-images]
     runs-on: ubuntu-22.04
+    needs: [validate, build-and-test-images]
+
     steps:
         - name: Declare victory!
           run: echo "Success!"

@@ -9,7 +9,6 @@ COPY go.* ./
 RUN go mod download
 COPY . .
 ENV CGO_ENABLED=0
-RUN make test
 RUN make GIT_TAG="${GIT_TAG}" GIT_COMMIT="${GIT_COMMIT}" GIT_DIRTY="${GIT_DIRTY}" build
 
 # Build a scratch image with just the SPIFFE CSI driver binary
