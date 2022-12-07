@@ -18,8 +18,26 @@ jobs:
       - name: Test
         run: make test
 
-  build-and-test-images:
+  build:
     runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Build image
+        run: make docker-build
+      - name: Upload image artifact
+        run: docker save ghcr.io/spiffe/spiffe-csi-driver:devel | gzip > images.tar.gz
+      - name: Archive images
+        uses: actions/upload-artifact@v3
+        with:
+          name: images
+          path: images.tar.gz
+
+  integration-test:
+    runs-on: ubuntu-22.04
+    needs: [build]
+
     strategy:
       fail-fast: false
       matrix:
@@ -33,18 +51,24 @@ jobs:
           - v1.23.13
           - v1.22.15
           - v1.21.14
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Build image
-        run: make docker-build
+      - name: Download archived images
+        uses: actions/download-artifact@v3
+        with:
+          name: images
+          path: .
+      - name: Load archived images
+        run: zcat images.tar.gz | docker load
       - name: Run integration tests
         run: K8S_VERSION=${{ matrix.k8s-version }} test/run.sh
 
   success:
     runs-on: ubuntu-22.04
-    needs: [validate, build-and-test-images]
+    needs: [validate, integration-test]
 
     steps:
         - name: Declare victory!
-          run: echo "Success!"
+          run: echo "# Successful" >> $GITHUB_STEP_SUMMARY
