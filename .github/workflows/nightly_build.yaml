@@ -4,6 +4,7 @@ on:
     # Random minute number to avoid GH scheduler stampede
     - cron: '52 21 * * *'
   workflow_dispatch: {}
+
 jobs:
   build-and-publish-images:
     runs-on: ubuntu-22.04
@@ -13,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@main
       - name: Build image
         run: make docker-build
       - name: Log in to GHCR

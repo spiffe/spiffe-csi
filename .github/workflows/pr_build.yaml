@@ -24,10 +24,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@main
       - name: Build image
         run: make docker-build
-      - name: Upload image artifact
-        run: docker save ghcr.io/spiffe/spiffe-csi-driver:devel | gzip > images.tar.gz
+      - name: Export images
+        run: tar -czvf images.tar.gz *-image.tar
       - name: Archive images
         uses: actions/upload-artifact@v3
         with:
@@ -55,13 +61,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@main
       - name: Download archived images
         uses: actions/download-artifact@v3
         with:
           name: images
           path: .
       - name: Load archived images
-        run: zcat images.tar.gz | docker load
+        run: |
+          tar xvf images.tar.gz
+          make load-images
       - name: Run integration tests
         run: K8S_VERSION=${{ matrix.k8s-version }} test/run.sh
 

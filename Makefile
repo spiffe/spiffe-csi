@@ -28,6 +28,8 @@ endif
 # Vars
 ############################################################################
 
+PLATFORMS ?= linux/amd64,linux/arm64
+
 build_dir := $(DIR)/.build/$(os1)-$(arch1)
 
 golangci_lint_version = v1.49.0
@@ -53,24 +55,33 @@ endif
 ifneq ($(GIT_DIRTY),)
 go_ldflags += -X github.com/spiffe/spiffe-csi/internal/version.gitDirty=$(GIT_DIRTY)
 endif
-go_ldflags := '${go_ldflags}'
+
+.PHONY: FORCE
+FORCE: ;
 
 .PHONY: default
 default: docker-build
 
+.PHONY: container-builder
+container-builder:
+	docker buildx create --platform $(PLATFORMS) --name container-builder --node container-builder0 --use
+
 .PHONY: docker-build
-docker-build:
-	docker build \
+docker-build: spiffe-csi-driver-image.tar
+
+spiffe-csi-driver-image.tar: Dockerfile FORCE | container-builder
+	docker buildx build \
+		--platform $(PLATFORMS) \
 		--build-arg GIT_TAG=$(git_tag:v%=%) \
 		--build-arg GIT_COMMIT=$(git_commit) \
 		--build-arg GIT_DIRTY=$(git_dirty) \
 		--target spiffe-csi-driver \
-		-t ghcr.io/spiffe/spiffe-csi-driver:devel \
+		-o type=oci,dest=$@ \
 		.
 
 .PHONY: build
 build: | bin
-	CGO_ENABLED=0 go build -ldflags ${go_ldflags} -o bin/spiffe-csi-driver ./cmd/spiffe-csi-driver
+	CGO_ENABLED=0 go build -ldflags '$(go_ldflags)' -o bin/spiffe-csi-driver ./cmd/spiffe-csi-driver
 
 .PHONY: test
 test:
@@ -79,6 +90,7 @@ test:
 bin:
 	mkdir bin
 
+.PHONY: lint
 lint: $(golangci_lint_bin)
 	@GOLANGCI_LINT_CACHE="$(golangci_lint_cache)" $(golangci_lint_bin) run ./...
 
@@ -88,3 +100,7 @@ $(golangci_lint_bin):
 	@mkdir -p $(golangci_lint_dir)
 	@mkdir -p $(golangci_lint_cache)
 	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(golangci_lint_dir) $(golangci_lint_version)
+
+.PHONY: load-images
+load-images: spiffe-csi-driver-image.tar
+	./.github/workflows/scripts/load-oci-archives.sh
