@@ -36,8 +36,13 @@ fi
 
 echo "Pushing image tagged as ${version}..."
 
-LOCALIMG=ghcr.io/spiffe/spiffe-csi-driver:devel
-REMOTEIMG=ghcr.io/spiffe/spiffe-csi-driver:"${version}"
+image=spiffe-csi-driver
+org_name=$(echo "$GITHUB_REPOSITORY" | tr '/' "\n" | head -1 | tr -d "\n")
+org_name="${org_name:-spiffe}" # default to spiffe in case ran outside of GitHub actions
+registry=ghcr.io/${org_name}
+
+LOCALIMG=ghcr.io/spiffe/${image}:devel
+REMOTEIMG="${registry}/${image}:${version}"
 
 echo "Executing: docker tag $LOCALIMG $REMOTEIMG"
 docker tag "$LOCALIMG" "$REMOTEIMG"
