@@ -48,3 +48,6 @@ echo "Executing: docker tag $LOCALIMG $REMOTEIMG"
 docker tag "$LOCALIMG" "$REMOTEIMG"
 echo "Executing: docker push $REMOTEIMG"
 docker push "$REMOTEIMG"
+
+image_digest="$(docker inspect "${REMOTEIMG}" --format '{{ index .RepoDigests 0 }}' | awk -F '@' '{ print $2 }')"
+cosign sign "${registry}/${image}@${image_digest}"
