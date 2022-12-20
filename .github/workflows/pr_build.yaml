@@ -6,6 +6,10 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-22.04
+
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -20,6 +24,9 @@ jobs:
 
   build:
     runs-on: ubuntu-22.04
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -37,6 +44,9 @@ jobs:
   integration-test:
     runs-on: ubuntu-22.04
     needs: [build]
+
+    permissions:
+      contents: read
 
     strategy:
       fail-fast: false
@@ -68,6 +78,9 @@ jobs:
   success:
     runs-on: ubuntu-22.04
     needs: [validate, integration-test]
+
+    permissions:
+      contents: read
 
     steps:
         - name: Declare victory!
