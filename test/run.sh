@@ -87,9 +87,13 @@ delete-cluster() {
 }
 
 load-images() {
+    org_name=$(echo "$GITHUB_REPOSITORY" | tr '/' "\n" | head -1 | tr -d "\n")
+    org_name="${org_name:-spiffe}" # default to spiffe in case ran on local
+    registry=ghcr.io/${org_name}
+
     echo "Loading images..."
     "${KIND}" load docker-image \
-        ghcr.io/spiffe/spiffe-csi-driver:devel \
+        "${registry}/spiffe-csi-driver:devel" \
         spiffe-csi-test-workload:test
     echo "Images loaded."
 }

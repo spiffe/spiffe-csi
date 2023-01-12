@@ -19,7 +19,23 @@ function usage {
   grep '^##' "$0" | sed -e 's/^##//' -e "s/__PROG__/$me/" >&2
 }
 
+function normalize_path {
+  # Remove all /./ sequences.
+  local path=${1//\/.\//\/}
+  local npath
+  # Remove first dir/.. sequence.
+  npath="${path//[^\/][^\/]*\/\.\.\//}"
+  # Remove remaining dir/.. sequence.
+  while [[ $npath != "$path" ]] ; do
+    path=$npath
+    npath="${path//[^\/][^\/]*\/\.\.\//}"
+  done
+  echo "$path"
+}
+
 me=$(basename "$0")
+BASEDIR=$(dirname "$0")
+ROOTDIR="$(normalize_path "$BASEDIR/../../../")"
 
 version="$1"
 # remove the git tag prefix
@@ -34,17 +50,13 @@ if [ -z "${version}" ]; then
     exit 1
 fi
 
-echo "Pushing image tagged as ${version}..."
-
 image=spiffe-csi-driver
 org_name=$(echo "$GITHUB_REPOSITORY" | tr '/' "\n" | head -1 | tr -d "\n")
 org_name="${org_name:-spiffe}" # default to spiffe in case ran outside of GitHub actions
 registry=ghcr.io/${org_name}
+image_to_push="${registry}/${image}:${version}"
+oci_dir="ocidir://${ROOTDIR}oci/${image}"
 
-LOCALIMG=ghcr.io/spiffe/${image}:devel
-REMOTEIMG="${registry}/${image}:${version}"
-
-echo "Executing: docker tag $LOCALIMG $REMOTEIMG"
-docker tag "$LOCALIMG" "$REMOTEIMG"
-echo "Executing: docker push $REMOTEIMG"
-docker push "$REMOTEIMG"
+echo "Pushing ${image_to_push}."
+regctl image import "${oci_dir}" "${image}-image.tar"
+regctl image copy "${oci_dir}" "${image_to_push}"

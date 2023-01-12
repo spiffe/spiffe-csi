@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@main
       - name: Build image
         run: make docker-build
       - name: Log in to GHCR
