@@ -8,9 +8,11 @@ on:
 jobs:
   build-and-publish-images:
     runs-on: ubuntu-22.04
+
     permissions:
+      contents: read
       packages: write
-      
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
