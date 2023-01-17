@@ -55,8 +55,11 @@ org_name=$(echo "$GITHUB_REPOSITORY" | tr '/' "\n" | head -1 | tr -d "\n")
 org_name="${org_name:-spiffe}" # default to spiffe in case ran outside of GitHub actions
 registry=ghcr.io/${org_name}
 image_to_push="${registry}/${image}:${version}"
-oci_dir="ocidir://${ROOTDIR}oci/${image}"
+oci_dir="${ROOTDIR}oci/${image}"
 
 echo "Pushing ${image_to_push}."
-regctl image import "${oci_dir}" "${image}-image.tar"
-regctl image copy "${oci_dir}" "${image_to_push}"
+regctl image import "ocidir://${oci_dir}" "${image}-image.tar"
+regctl image copy "ocidir://${oci_dir}" "${image_to_push}"
+
+image_digest="$(jq -r '.manifests[0].digest' "${oci_dir}/index.json")"
+cosign sign "${registry}/${image}@${image_digest}"
