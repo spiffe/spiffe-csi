@@ -1,5 +1,5 @@
 # Build the SPIFFE CSI Driver binary
-FROM --platform=${BUILDPLATFORM} golang:1.19.3-alpine AS base
+FROM --platform=${BUILDPLATFORM} golang:1.20.1-alpine AS base
 ARG GIT_TAG
 ARG GIT_COMMIT
 ARG GIT_DIRTY
