@@ -18,6 +18,7 @@ var (
 	nodeIDFlag               = flag.String("node-id", "", "Kubernetes Node ID. If unset, the node ID is obtained from the environment (i.e., -node-id-env)")
 	nodeIDEnvFlag            = flag.String("node-id-env", "MY_NODE_NAME", "Envvar from which to obtain the node ID. Overridden by -node-id.")
 	csiSocketPathFlag        = flag.String("csi-socket-path", "/spiffe-csi/csi.sock", "Path to the CSI socket")
+	pluginNameFlag           = flag.String("plugin-name", "csi.spiffe.io", "Plugin name to register")
 	workloadAPISocketDirFlag = flag.String("workload-api-socket-dir", "", "Path to the Workload API socket directory")
 )
 
@@ -51,6 +52,7 @@ func main() {
 	driver, err := driver.New(driver.Config{
 		Log:                  log,
 		NodeID:               nodeID,
+		PluginName:           *pluginNameFlag,
 		WorkloadAPISocketDir: *workloadAPISocketDirFlag,
 	})
 	if err != nil {
