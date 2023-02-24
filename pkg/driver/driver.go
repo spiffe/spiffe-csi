@@ -15,10 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	pluginName = "csi.spiffe.io"
-)
-
 var (
 	// We replace these in tests since bind mounting generally requires root.
 	bindMountRW  = mount.BindMountRW
@@ -30,6 +26,7 @@ var (
 type Config struct {
 	Log                  logr.Logger
 	NodeID               string
+	PluginName           string
 	WorkloadAPISocketDir string
 }
 
@@ -40,6 +37,7 @@ type Driver struct {
 
 	log                  logr.Logger
 	nodeID               string
+	pluginName           string
 	workloadAPISocketDir string
 }
 
@@ -54,6 +52,7 @@ func New(config Config) (*Driver, error) {
 	return &Driver{
 		log:                  config.Log,
 		nodeID:               config.NodeID,
+		pluginName:           config.PluginName,
 		workloadAPISocketDir: config.WorkloadAPISocketDir,
 	}, nil
 }
@@ -64,7 +63,7 @@ func New(config Config) (*Driver, error) {
 
 func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	return &csi.GetPluginInfoResponse{
-		Name:          pluginName,
+		Name:          d.pluginName,
 		VendorVersion: version.Version(),
 	}, nil
 }

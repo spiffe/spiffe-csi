@@ -408,6 +408,7 @@ func startDriver(t *testing.T) (client, string) {
 	d, err := New(Config{
 		Log:                  logr.Discard(),
 		NodeID:               testNodeID,
+		PluginName:           "csi.spiffe.io",
 		WorkloadAPISocketDir: workloadAPISocketDir,
 	})
 	require.NoError(t, err)
