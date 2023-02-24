@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.3] - 2023-02-24
+
+### Changed
+
+- Fixed a broken version string causing panic on startup.
+
 ## [0.2.2] - 2023-02-24
 
 ### Added
