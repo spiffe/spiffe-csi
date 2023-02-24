@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.2] - 2023-02-24
+
+### Added
+
+- Flag to configure the plugin name. This allows multiple instances of the driver to run under different names (#86)
+
+### Changed
+
+- Docker images are now multiarch with amd64 and arm64 support (#70)
+- Docker images are now signed by sigstore (#73)
+
 ## [0.2.1] - 2022-11-07
 
 ### Changed
