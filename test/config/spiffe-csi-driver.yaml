@@ -29,8 +29,11 @@ spec:
       containers:
         # This is the container which runs the SPIFFE CSI driver.
         - name: spiffe-csi-driver
-          image: ghcr.io/spiffe/spiffe-csi-driver:0.2.0
-          imagePullPolicy: IfNotPresent
+          # This is hardcoded to test the development image that that was
+          # just built and to never pull. This should be changed in production.
+          # DO NOT CHANGE THE IMAGE VERSION FOR TESTS UNLESS YOU KNOW WHAT YOU ARE DOING.
+          image: ghcr.io/spiffe/spiffe-csi-driver:devel
+          imagePullPolicy: Never
           args: [
             "-workload-api-socket-dir", "/spire-agent-socket",
             "-csi-socket-path", "/spiffe-csi/csi.sock",
