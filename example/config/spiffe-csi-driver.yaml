@@ -80,6 +80,21 @@ spec:
             # directory
             - name: kubelet-plugin-registration-dir
               mountPath: /registration
+      initContainers:
+      - name: set-context
+        image: ubuntu:22.04
+        command: ["chcon", "-Rt", "container_file_t", "spire-agent-socket/"]
+        resources: {}
+        securityContext:
+          capabilities:
+            drop:
+            - all
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /spire-agent-socket
+          name: spire-agent-socket-dir
       volumes:
         # This volume is used to share the Workload API socket between the CSI
         # driver and SPIRE agent. Note, an emptyDir volume could also be used
