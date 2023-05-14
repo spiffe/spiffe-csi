@@ -87,6 +87,14 @@ Ensure that the Workload API socket directory is shared with the SPIFFE CSI
 Driver via a `hostPath` volume. The directory backing `emptyDir` volumes are
 tied to the pod instance and invalidated when the pod is restarted.
 
+### Permission Denied accessing Workload API directory
+
+This may be caused by SELinux in environments like OpenShift. The SPIFFE CSI
+Driver attempts to set the container file label on the Workload API socket
+directory on startup. Check the logs to see if it was successful. To be
+successful, the Workload API socket directory must be mounted read-write into
+the CSI driver container.
+
 ## Reporting a Vulnerability
 
 Vulnerabilities can be reported by sending an email to security@spiffe.io. A

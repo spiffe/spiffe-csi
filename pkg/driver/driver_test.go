@@ -34,6 +34,7 @@ func init() {
 	unmount = func(dst string) error {
 		return os.Remove(metaPath(dst))
 	}
+	chcon = writeSELinuxLabel
 }
 
 func TestNew(t *testing.T) {
@@ -41,6 +42,7 @@ func TestNew(t *testing.T) {
 
 	t.Run("node ID is required", func(t *testing.T) {
 		_, err := New(Config{
+			Log:                  logr.Discard(),
 			WorkloadAPISocketDir: workloadAPISocketDir,
 		})
 		require.EqualError(t, err, "node ID is required")
@@ -48,6 +50,7 @@ func TestNew(t *testing.T) {
 
 	t.Run("workload API socket directory is required", func(t *testing.T) {
 		_, err := New(Config{
+			Log:    logr.Discard(),
 			NodeID: testNodeID,
 		})
 		require.EqualError(t, err, "workload API socket directory is required")
@@ -55,10 +58,12 @@ func TestNew(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		_, err := New(Config{
+			Log:                  logr.Discard(),
 			NodeID:               testNodeID,
 			WorkloadAPISocketDir: workloadAPISocketDir,
 		})
 		require.NoError(t, err)
+		assertSELinuxLabelWritten(t, workloadAPISocketDir)
 	})
 }
 
@@ -469,6 +474,13 @@ func assertNotMounted(t *testing.T, targetPath string) {
 	assert.Error(t, err, "should not be mounted")
 }
 
+func assertSELinuxLabelWritten(t *testing.T, fpath string) {
+	label, err := readSELinuxLabel(fpath)
+	if assert.NoError(t, err, "failed to read selinux label file") {
+		assert.Equal(t, "container_file_t-recursive-true", label)
+	}
+}
+
 func readMeta(targetPath string) (string, error) {
 	data, err := os.ReadFile(metaPath(targetPath))
 	return string(data), err
@@ -478,8 +490,21 @@ func writeMeta(targetPath string, meta string) error {
 	return os.WriteFile(metaPath(targetPath), []byte(meta), 0600)
 }
 
+func readSELinuxLabel(fpath string) (string, error) {
+	data, err := os.ReadFile(seLinuxLabelPath(fpath))
+	return string(data), err
+}
+
+func writeSELinuxLabel(fpath string, label string, recursive bool) error {
+	return os.WriteFile(seLinuxLabelPath(fpath), []byte(fmt.Sprintf("%s-recursive-%t", label, recursive)), 0600)
+}
+
 func metaPath(targetPath string) string {
 	return filepath.Join(targetPath, "meta")
+}
+
+func seLinuxLabelPath(targetPath string) string {
+	return filepath.Join(targetPath, "selinux-label")
 }
 
 func dumpIt(t *testing.T, when, dir string) {
