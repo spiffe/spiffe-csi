@@ -3,7 +3,7 @@ module github.com/spiffe/spiffe-csi
 go 1.19
 
 require (
-	github.com/container-storage-interface/spec v1.7.0
+	github.com/container-storage-interface/spec v1.8.0
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zapr v1.2.3
 	github.com/stretchr/testify v1.8.1
