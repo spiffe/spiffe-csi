@@ -22,10 +22,12 @@ const (
 
 var (
 	// We replace these in tests since bind mounting generally requires root.
-	bindMountRW  = mount.BindMountRW
-	unmount      = mount.Unmount
-	isMountPoint = mount.IsMountPoint
-	chcon        = selinux.Chcon
+	bindMountRW        = mount.BindMountRW
+	unmount            = mount.Unmount
+	isMountPoint       = mount.IsMountPoint
+	chcon              = selinux.Chcon
+	seLinuxEnabled     = selinux.GetEnabled
+	seLinuxEnforceMode = selinux.EnforceMode
 )
 
 // Config is the configuration for the driver
@@ -60,12 +62,21 @@ func New(config Config) (*Driver, error) {
 	// mount to be used within OpenShift, for example. This will fail if the
 	// Workload API socket directory is mounted read-only, but that will only
 	// result in a failure if SELinux is enabled and enforcing.
-	if err := chcon(config.WorkloadAPISocketDir, seLinuxContainerFileLabel, true); err != nil {
-		if selinux.GetEnabled() && selinux.EnforceMode() == selinux.Enforcing {
+	seLinuxEnabled := seLinuxEnabled()
+	seLinuxEnforceMode := seLinuxEnforceMode()
+	seLinuxProcessLabel, seLinuxFileLabel := selinux.ContainerLabels()
+	config.Log.Info("SELinux status",
+		"enabled", seLinuxEnabled,
+		"enforceMode", seLinuxEnforceMode,
+		"processLabel", seLinuxProcessLabel,
+		"fileLabel", seLinuxFileLabel,
+	)
+	if seLinuxEnabled && seLinuxEnforceMode == selinux.Enforcing {
+		if err := chcon(config.WorkloadAPISocketDir, seLinuxContainerFileLabel, true); err != nil {
 			return nil, fmt.Errorf("failed to set the container file label on the Workload API socket directory: %v", err)
+		} else {
+			config.Log.Info("Set the container file label on the Workload API socket directory")
 		}
-	} else {
-		config.Log.Info("Set the container file label on the Workload API socket directory")
 	}
 
 	return &Driver{

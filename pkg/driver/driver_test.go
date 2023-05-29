@@ -14,6 +14,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spiffe/spiffe-csi/internal/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,6 +36,12 @@ func init() {
 		return os.Remove(metaPath(dst))
 	}
 	chcon = writeSELinuxLabel
+	seLinuxEnabled = func() bool {
+		return true
+	}
+	seLinuxEnforceMode = func() int {
+		return selinux.Enforcing
+	}
 }
 
 func TestNew(t *testing.T) {
