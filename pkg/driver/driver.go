@@ -58,11 +58,14 @@ func New(config Config) (*Driver, error) {
 
 	// Set the SELinux label on the workload API directory. This allows the
 	// mount to be used within OpenShift, for example. This will fail if the
-	// Workload API socket directory is mounted read-only.
+	// Workload API socket directory is mounted read-only, but that will only
+	// result in a failure if SELinux is enabled and enforcing.
 	if err := chcon(config.WorkloadAPISocketDir, seLinuxContainerFileLabel, true); err != nil {
-		config.Log.Error(err, "Failed to set the container file label on the Workload API socket directory. Is the Workload API directory mounted read-write?")
+		if selinux.GetEnabled() && selinux.EnforceMode() == selinux.Enforcing {
+			return nil, fmt.Errorf("failed to set the container file label on the Workload API socket directory: %v", err)
+		}
 	} else {
-		config.Log.Info("Successfully set the container file label on the Workload API socket directory")
+		config.Log.Info("Set the container file label on the Workload API socket directory")
 	}
 
 	return &Driver{
