@@ -73,10 +73,9 @@ func New(config Config) (*Driver, error) {
 	)
 	if seLinuxEnabled && seLinuxEnforceMode == selinux.Enforcing {
 		if err := chcon(config.WorkloadAPISocketDir, seLinuxContainerFileLabel, true); err != nil {
-			return nil, fmt.Errorf("failed to set the container file label on the Workload API socket directory: %v", err)
-		} else {
-			config.Log.Info("Set the container file label on the Workload API socket directory")
+			return nil, fmt.Errorf("failed to set the container file label on the Workload API socket directory: %w", err)
 		}
+		config.Log.Info("Set the container file label on the Workload API socket directory")
 	}
 
 	return &Driver{
