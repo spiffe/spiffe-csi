@@ -51,6 +51,14 @@ esac
 
 
 cleanup() {
+    if [ -z "${SUCCESS}" ]; then
+        "${KUBECTL}" logs deployment/spire-server -nspire-system --all-containers=true || true
+        "${KUBECTL}" logs daemonset/spire-agent -nspire-system --all-containers=true || true
+        "${KUBECTL}" logs daemonset/spiffe-csi-driver -nspire-system --all-containers=true || true
+        "${KUBECTL}" logs deployment/test-workload-1 --all-containers=true || true
+        "${KUBECTL}" logs deployment/test-workload-2 --all-containers=true || true
+    fi
+
     delete-cluster
     rm -rf "${TMPDIR}"
 }
@@ -104,6 +112,8 @@ apply-yaml() {
     "${KUBECTL}" rollout status -w --timeout=1m -nspire-system deployment/spire-server
     echo "Waiting for SPIRE agent rollout..."
     "${KUBECTL}" rollout status -w --timeout=1m -nspire-system daemonset/spire-agent
+    echo "Waiting for SPIFFE CSI driver rollout..."
+    "${KUBECTL}" rollout status -w --timeout=1m -nspire-system daemonset/spiffe-csi-driver
     echo "Waiting for test workload 1 rollout..."
     "${KUBECTL}" rollout status -w --timeout=1m deployment/test-workload-1
     echo "Waiting for test workload 2 rollout..."
@@ -159,5 +169,5 @@ apply-yaml
 register-workload
 check-workload-status "test-workload-1"
 check-workload-status "test-workload-2"
-"${KUBECTL}" logs -nspire-system daemonset/spiffe-csi-driver -c spiffe-csi-driver
+SUCCESS=1
 echo "Done."

@@ -8,6 +8,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spiffe/spiffe-csi/internal/version"
 	"github.com/spiffe/spiffe-csi/pkg/logkeys"
 	"github.com/spiffe/spiffe-csi/pkg/mount"
@@ -15,11 +16,18 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	seLinuxContainerFileLabel = "container_file_t"
+)
+
 var (
 	// We replace these in tests since bind mounting generally requires root.
-	bindMountRW  = mount.BindMountRW
-	unmount      = mount.Unmount
-	isMountPoint = mount.IsMountPoint
+	bindMountRW        = mount.BindMountRW
+	unmount            = mount.Unmount
+	isMountPoint       = mount.IsMountPoint
+	chcon              = selinux.Chcon
+	seLinuxEnabled     = selinux.GetEnabled
+	seLinuxEnforceMode = selinux.EnforceMode
 )
 
 // Config is the configuration for the driver
@@ -49,6 +57,27 @@ func New(config Config) (*Driver, error) {
 	case config.WorkloadAPISocketDir == "":
 		return nil, errors.New("workload API socket directory is required")
 	}
+
+	// Set the SELinux label on the workload API directory. This allows the
+	// mount to be used within OpenShift, for example. This will fail if the
+	// Workload API socket directory is mounted read-only, but that will only
+	// result in a failure if SELinux is enabled and enforcing.
+	seLinuxEnabled := seLinuxEnabled()
+	seLinuxEnforceMode := seLinuxEnforceMode()
+	seLinuxProcessLabel, seLinuxFileLabel := selinux.ContainerLabels()
+	config.Log.Info("SELinux status",
+		"enabled", seLinuxEnabled,
+		"enforceMode", seLinuxEnforceMode,
+		"processLabel", seLinuxProcessLabel,
+		"fileLabel", seLinuxFileLabel,
+	)
+	if seLinuxEnabled && seLinuxEnforceMode == selinux.Enforcing {
+		if err := chcon(config.WorkloadAPISocketDir, seLinuxContainerFileLabel, true); err != nil {
+			return nil, fmt.Errorf("failed to set the container file label on the Workload API socket directory: %w", err)
+		}
+		config.Log.Info("Set the container file label on the Workload API socket directory")
+	}
+
 	return &Driver{
 		log:                  config.Log,
 		nodeID:               config.NodeID,
