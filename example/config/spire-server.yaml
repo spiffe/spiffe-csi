@@ -105,7 +105,6 @@ data:
       trust_domain = "example.org"
       data_dir = "/run/spire/data"
       log_level = "DEBUG"
-      default_svid_ttl = "1h"
       ca_ttl = "12h"
       ca_subject {
         country = ["US"]
@@ -178,7 +177,7 @@ spec:
       shareProcessNamespace: true
       containers:
         - name: spire-server
-          image: ghcr.io/spiffe/spire-server:1.1.1
+          image: ghcr.io/spiffe/spire-server:1.8.0
           imagePullPolicy: IfNotPresent
           args: ["-config", "/run/spire/config/server.conf"]
           ports:
