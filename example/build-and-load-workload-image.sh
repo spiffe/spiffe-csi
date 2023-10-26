@@ -5,9 +5,10 @@ set -e -o pipefail
 DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 echo "Building the example workload image..."
-docker build "$DIR"/workload -t spiffe-csi-driver-example-workload:example
+cd "$DIR"/workload
+KO_DOCKER_REPO=ko.local/spiffe-csi-driver-example-workload ko build --bare -t example .
 
 echo "Loading example workload image into Kind..."
-kind load docker-image spiffe-csi-driver-example-workload:example
+kind load docker-image ko.local/spiffe-csi-driver-example-workload:example
 
 echo "Done."
