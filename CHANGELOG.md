@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.4] - 2023-11-02
+
+### Security
+
+- Updated to google.golang.org/grpc v1.59.0 to address CVE-2023-44487
+
 ## [0.2.3] - 2023-02-24
 
 ### Changed
