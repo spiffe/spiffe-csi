@@ -8,7 +8,7 @@ require (
 	github.com/go-logr/zapr v1.3.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.26.0
-	golang.org/x/sys v0.14.0
+	golang.org/x/sys v0.15.0
 	google.golang.org/grpc v1.59.0
 )
 
