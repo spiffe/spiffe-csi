@@ -4,6 +4,16 @@ updates:
   directory: "/"
   schedule:
     interval: daily
+  groups:
+    actions:
+      patterns:
+        - "github.com/actions/*"
+    k8s.io:
+      patterns:
+        - "k8s.io/*"
+    sigs.k8s.io:
+      patterns:
+        - "sig.k8s.io/*"
   open-pull-requests-limit: 5
 - package-ecosystem: "github-actions"
   directory: "/"
