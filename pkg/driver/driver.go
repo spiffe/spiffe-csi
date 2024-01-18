@@ -159,10 +159,17 @@ func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublish
 		return nil, status.Error(codes.InvalidArgument, "request missing required target path")
 	}
 
-	if err := unmount(req.TargetPath); err != nil {
-		return nil, status.Errorf(codes.Internal, "unable to unmount %q: %v", req.TargetPath, err)
+	// Check if target is a valid mount and issue unmount request
+	if ok, err := isMountPoint(req.TargetPath); err != nil {
+		return nil, status.Errorf(codes.Internal, "unable to verify mount point %q: %v", req.TargetPath, err)
+	} else if ok {
+		if err := unmount(req.TargetPath); err != nil {
+			return nil, status.Errorf(codes.Internal, "unable to unmount %q: %v", req.TargetPath, err)
+		}
 	}
-	if err := os.Remove(req.TargetPath); err != nil {
+
+	// Check and remove the mount path if present, report an error otherwise
+	if err := os.Remove(req.TargetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, status.Errorf(codes.Internal, "unable to remove target path %q: %v", req.TargetPath, err)
 	}
 
