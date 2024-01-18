@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	testNodeID = "nodeID"
+	testNodeID         = "nodeID"
 	unmountFailureTest = "unmount failure"
 	isMountFailureTest = "isMount failure"
 )
@@ -340,7 +340,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			expectMsgPrefix: "request missing required target path",
 		},
 		{
-			desc: isMountFailureTest,
+			desc:            isMountFailureTest,
 			expectCode:      codes.Internal,
 			expectMsgPrefix: "unable to verify mount point",
 		},
