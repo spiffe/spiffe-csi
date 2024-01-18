@@ -25,6 +25,12 @@ import (
 
 const (
 	testNodeID = "nodeID"
+	unmountFailureTest = "unmount failure"
+	isMountFailureTest = "isMount failure"
+)
+
+var (
+	testDescription string
 )
 
 func init() {
@@ -33,6 +39,17 @@ func init() {
 	}
 	unmount = func(dst string) error {
 		return os.Remove(metaPath(dst))
+	}
+	isMountPoint = func(dst string) (bool, error) {
+		if testDescription == unmountFailureTest {
+			return true, nil
+		}
+
+		if testDescription == isMountFailureTest {
+			return false, fmt.Errorf("mock invalid mount point")
+		}
+
+		return true, nil
 	}
 }
 
@@ -323,7 +340,12 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			expectMsgPrefix: "request missing required target path",
 		},
 		{
-			desc: "unmount failure",
+			desc: isMountFailureTest,
+			expectCode:      codes.Internal,
+			expectMsgPrefix: "unable to verify mount point",
+		},
+		{
+			desc: unmountFailureTest,
 			mungeTargetPath: func(t *testing.T, targetPath string) {
 				// Removing the meta file to simulate that it wasn't mounted
 				require.NoError(t, os.Remove(metaPath(targetPath)))
@@ -365,6 +387,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			if tt.mutateReq != nil {
 				tt.mutateReq(req)
 			}
+			registerTestDescription(tt.desc)
 			dumpIt(t, "BEFORE", targetPathBase)
 			resp, err := client.NodeUnpublishVolume(context.Background(), req)
 			dumpIt(t, "AFTER", targetPathBase)
@@ -377,6 +400,10 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			}
 		})
 	}
+}
+
+func registerTestDescription(desc string) {
+	testDescription = desc
 }
 
 func requireGRPCStatusPrefix(tb testing.TB, err error, code codes.Code, msgPrefix string, msgAndArgs ...interface{}) {
