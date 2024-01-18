@@ -83,7 +83,7 @@ jobs:
           tar xvf images.tar.gz
           make load-images
       - name: Run integration tests
-        run: K8S_VERSION=${{ matrix.k8s-version }} test/run.sh
+        run: K8S_VERSION=${{ matrix.k8s-version }} KUBECTL_VERSION=${{ matrix.k8s-version }} test/run.sh
 
   publish:
     runs-on: ubuntu-latest
