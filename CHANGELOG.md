@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.5] - 2024-01-23
+
+### Fixed
+
+- The unmount operation now allows pods to terminate properly after a node reboot (#161)
+
 ## [0.2.4] - 2023-11-02
 
 ### Security
