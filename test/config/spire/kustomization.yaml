@@ -3,5 +3,3 @@ resources:
 - spiffe-csi-driver.yaml
 - spire-server.yaml
 - spire-agent.yaml
-- spiffe-csi-test-workload-1.yaml
-- spiffe-csi-test-workload-2.yaml

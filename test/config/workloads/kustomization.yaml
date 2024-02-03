@@ -1,0 +1,3 @@
+resources:
+- test-workload-1.yaml
+- test-workload-2.yaml
