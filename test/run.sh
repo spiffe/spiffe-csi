@@ -4,18 +4,41 @@ set -e -o pipefail
 
 DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-# Versions under test
-KIND_VERSION=${KIND_VERSION:-v0.17.0}
-KUBECTL_VERSION=${KUBECTL_VERSION:-v1.25.3}
 
-# e.g. K8S_VERSION=v1.22.4
-# https://hub.docker.com/r/kindest/node/tags
-if test -n "$K8S_VERSION"; then
-    KIND_NODE="--image=kindest/node:$K8S_VERSION"
-else
-    # Just use the default.
-    KIND_NODE=""
-fi
+# Versions under test
+K8S_VERSION=${K8S_VERSION:-v1.29.1}
+
+# Determine which Kind node to use for the K8s version under test. The node
+# hashes are tightly coupled to the Kind version used and they must be updated
+# together.
+KIND_VERSION=v0.21.0
+case "$K8S_VERSION" in
+    v1.29.1)
+        KIND_NODE="sha256:a0cc28af37cf39b019e2b448c54d1a3f789de32536cb5a5db61a49623e527144"
+        ;;
+    v1.28.6)
+        KIND_NODE="sha256:b7e1cf6b2b729f604133c667a6be8aab6f4dde5bb042c1891ae248d9154f665b"
+        ;;
+    v1.27.10)
+        KIND_NODE="sha256:3700c811144e24a6c6181065265f69b9bf0b437c45741017182d7c82b908918f"
+        ;;
+    v1.26.13)
+        KIND_NODE="sha256:15ae92d507b7d4aec6e8920d358fc63d3b980493db191d7327541fbaaed1f789"
+        ;;
+    v1.25.16)
+        KIND_NODE="sha256:9d0a62b55d4fe1e262953be8d406689b947668626a357b5f9d0cfbddbebbc727"
+        ;;
+    v1.24.17)
+        KIND_NODE="sha256:ea292d57ec5dd0e2f3f5a2d77efa246ac883c051ff80e887109fabefbd3125c7"
+        ;;
+    v1.23.17)
+        KIND_NODE="sha256:fbb92ac580fce498473762419df27fa8664dbaa1c5a361b5957e123b4035bdcf"
+        ;;
+    *)
+        echo "no kind node available for Kind $KIND_VERSION and Kubernetes $K8S_VERSION" 1>&2
+        exit 1
+        ;;
+esac
 
 # Export the Kind cluster name so we don't have to specify it on every kind
 # invocation
@@ -49,10 +72,44 @@ case "${ARCH}" in
         ;;
 esac
 
-
+SUCCESS=
 cleanup() {
-    delete-cluster
-    rm -rf "${TMPDIR}"
+    if [ -z "$SUCCESS" ]; then
+        echo "================================================="
+        echo "LOGS: SPIRE Server"
+        echo "================================================="
+        "${KUBECTL}" logs -nspire-system deployment/spire-server --all-containers=true || true
+
+        echo "================================================="
+        echo "LOGS: SPIRE Agent"
+        echo "================================================="
+        "${KUBECTL}" logs -nspire-system daemonset/spire-agent --all-containers=true || true
+
+        echo "================================================="
+        echo "LOGS: SPIFFE CSI Driver"
+        echo "================================================="
+        "${KUBECTL}" logs -nspire-system daemonset/spiffe-csi-driver --all-containers=true || true
+
+        echo "================================================="
+        echo "LOGS: Test Workload 1"
+        echo "================================================="
+        "${KUBECTL}" logs deployment/test-workload-1 --all-containers=true || true
+
+        echo "================================================="
+        echo "LOGS: Test Workload 2"
+        echo "================================================="
+        "${KUBECTL}" logs deployment/test-workload-2 --all-containers=true || true
+
+    fi
+
+    [ -n "$SKIPCLEANUP" ] || delete-cluster
+    [ -n "$SKIPCLEANUP" ] || rm -rf "${TMPDIR}"
+
+    if [ -z "$SUCCESS" ]; then
+        echo "================================================="
+        echo "!!! FAILED !!!!"
+        echo "================================================="
+    fi
 }
 
 build-workload() {
@@ -60,7 +117,7 @@ build-workload() {
 }
 
 download-kubectl() {
-    local _url="https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${OS}/${ARCH}/kubectl"
+    local _url="https://dl.k8s.io/release/${K8S_VERSION}/bin/${OS}/${ARCH}/kubectl"
     echo "Downloading ${_url}..."
     curl -s -Lo "${KUBECTL}" "${_url}"
     chmod +x "${KUBECTL}"
@@ -75,7 +132,7 @@ download-kind() {
 
 create-cluster() {
     echo "Creating cluster..."
-    "${KIND}" create cluster $KIND_NODE --config "${DIR}/config/cluster.yaml"
+    "${KIND}" create cluster --image=kindest/node@$KIND_NODE --config "${DIR}/config/cluster.yaml"
     echo "Cluster created."
     "${KUBECTL}" version
 }
@@ -98,19 +155,25 @@ load-images() {
     echo "Images loaded."
 }
 
-apply-yaml() {
-    "${KUBECTL}" apply -k "${DIR}"/config
+deploy-spire() {
+    "${KUBECTL}" apply -k "${DIR}"/config/spire
     echo "Waiting for SPIRE server rollout..."
     "${KUBECTL}" rollout status -w --timeout=1m -nspire-system deployment/spire-server
     echo "Waiting for SPIRE agent rollout..."
     "${KUBECTL}" rollout status -w --timeout=1m -nspire-system daemonset/spire-agent
+    echo "Waiting for SPIFFE CSI Driver rollout..."
+    "${KUBECTL}" rollout status -w --timeout=1m -nspire-system daemonset/spiffe-csi-driver
+}
+
+deploy-workloads() {
+    "${KUBECTL}" apply -k "${DIR}"/config/workloads
     echo "Waiting for test workload 1 rollout..."
     "${KUBECTL}" rollout status -w --timeout=1m deployment/test-workload-1
     echo "Waiting for test workload 2 rollout..."
     "${KUBECTL}" rollout status -w --timeout=1m deployment/test-workload-2
 }
 
-register-workload() {
+register-workloads() {
     "${KUBECTL}" exec \
         -nspire-system \
         deployment/spire-server -- \
@@ -155,9 +218,10 @@ download-kind
 download-kubectl
 create-cluster
 load-images
-apply-yaml
-register-workload
+deploy-spire
+register-workloads
+deploy-workloads
 check-workload-status "test-workload-1"
 check-workload-status "test-workload-2"
-"${KUBECTL}" logs -nspire-system daemonset/spiffe-csi-driver -c spiffe-csi-driver
+SUCCESS=1
 echo "Done."

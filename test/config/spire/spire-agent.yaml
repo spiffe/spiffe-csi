@@ -88,8 +88,6 @@ spec:
   selector:
     matchLabels:
       app: spire-agent
-  updateStrategy:
-    type: RollingUpdate
   template:
     metadata:
       namespace: spire-system
