@@ -6,30 +6,33 @@ DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 
 # Versions under test
-K8S_VERSION=${K8S_VERSION:-v1.26.3}
+K8S_VERSION=${K8S_VERSION:-v1.29.1}
 
 # Determine which Kind node to use for the K8s version under test. The node
 # hashes are tightly coupled to the Kind version used and they must be updated
 # together.
-KIND_VERSION=v0.18.0
+KIND_VERSION=v0.21.0
 case "$K8S_VERSION" in
-    v1.26.3)
-        KIND_NODE="sha256:61b92f38dff6ccc29969e7aa154d34e38b89443af1a2c14e6cfbd2df6419c66f"
+    v1.29.1)
+        KIND_NODE="sha256:a0cc28af37cf39b019e2b448c54d1a3f789de32536cb5a5db61a49623e527144"
         ;;
-    v1.25.8)
-        KIND_NODE="sha256:00d3f5314cc35327706776e95b2f8e504198ce59ac545d0200a89e69fce10b7f"
+    v1.28.6)
+        KIND_NODE="sha256:b7e1cf6b2b729f604133c667a6be8aab6f4dde5bb042c1891ae248d9154f665b"
         ;;
-    v1.24.12)
-        KIND_NODE="sha256:1e12918b8bc3d4253bc08f640a231bb0d3b2c5a9b28aa3f2ca1aee93e1e8db16"
+    v1.27.10)
+        KIND_NODE="sha256:3700c811144e24a6c6181065265f69b9bf0b437c45741017182d7c82b908918f"
+        ;;
+    v1.26.13)
+        KIND_NODE="sha256:15ae92d507b7d4aec6e8920d358fc63d3b980493db191d7327541fbaaed1f789"
+        ;;
+    v1.25.16)
+        KIND_NODE="sha256:9d0a62b55d4fe1e262953be8d406689b947668626a357b5f9d0cfbddbebbc727"
+        ;;
+    v1.24.17)
+        KIND_NODE="sha256:ea292d57ec5dd0e2f3f5a2d77efa246ac883c051ff80e887109fabefbd3125c7"
         ;;
     v1.23.17)
-        KIND_NODE="sha256:e5fd1d9cd7a9a50939f9c005684df5a6d145e8d695e78463637b79464292e66c"
-        ;;
-    v1.22.17)
-        KIND_NODE="sha256:c8a828709a53c25cbdc0790c8afe12f25538617c7be879083248981945c38693"
-        ;;
-    v1.21.14)
-        KIND_NODE="sha256:27ef72ea623ee879a25fe6f9982690a3e370c68286f4356bf643467c552a3888"
+        KIND_NODE="sha256:fbb92ac580fce498473762419df27fa8664dbaa1c5a361b5957e123b4035bdcf"
         ;;
     *)
         echo "no kind node available for Kind $KIND_VERSION and Kubernetes $K8S_VERSION" 1>&2
