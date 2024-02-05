@@ -155,6 +155,22 @@ data:
 
 ---
 
+# PersistentVolumeClaim for spire-server data store
+# needed to persist registrations over pod restarts
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spire-server-pvc
+  namespace: spire
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100M
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -186,10 +202,15 @@ spec:
             - name: spire-config
               mountPath: /run/spire/config
               readOnly: true
+            - name: spire-data
+              mountPath: /run/spire/data
       volumes:
         - name: spire-config
           configMap:
             name: spire-server
+        - name: spire-data
+          persistentVolumeClaim:
+            claimName: spire-server-pvc
 
 ---
 
