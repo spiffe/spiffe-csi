@@ -105,7 +105,7 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4 # v3.4.0
         with:
-          cosign-release: v1.13.1
+          cosign-release: v2.2.3
       - name: Install regctl
         uses: regclient/actions/regctl-installer@b6614f5f56245066b533343a85f4109bdc38c8cc # main
       - name: Download archived images
