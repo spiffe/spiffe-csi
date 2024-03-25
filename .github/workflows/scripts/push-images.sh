@@ -62,4 +62,4 @@ regctl image import "ocidir://${oci_dir}" "${image}-image.tar"
 regctl image copy "ocidir://${oci_dir}" "${image_to_push}"
 
 image_digest="$(jq -r '.manifests[0].digest' "${oci_dir}/index.json")"
-cosign sign "${registry}/${image}@${image_digest}"
+cosign sign -y "${registry}/${image}@${image_digest}"
