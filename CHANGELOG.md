@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- Updated Golang to 1.22.2 and google.golang.org/grpc to v1.63.2 in order to address CVE-2023-45288 (#338)
+
+## [0.2.5] - 2024-01-23
+
+### Fixed
+
 - The unmount operation now allows pods to terminate properly after a node reboot (#161)
 
 ## [0.2.4] - 2023-11-02
