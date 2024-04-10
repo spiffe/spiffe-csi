@@ -40,7 +40,7 @@ func init() {
 	unmount = func(dst string) error {
 		return os.Remove(metaPath(dst))
 	}
-	isMountPoint = func(dst string) (bool, error) {
+	isMountPoint = func(string) (bool, error) {
 		if testDescription == unmountFailureTest {
 			return true, nil
 		}
@@ -512,7 +512,7 @@ func metaPath(targetPath string) string {
 func dumpIt(t *testing.T, when, dir string) {
 	t.Logf(">>>>>>>>>> DUMPING %s %s", when, dir)
 	assert.NoError(t, filepath.Walk(dir, filepath.WalkFunc(
-		func(path string, info fs.FileInfo, err error) error {
+		func(path string, info fs.FileInfo, _ error) error {
 			t.Logf("%s: %o", path, info.Mode())
 			return nil
 		})))

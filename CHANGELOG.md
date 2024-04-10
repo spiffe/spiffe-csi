@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Updated Golang to 1.22.2 and google.golang.org/grpc to v1.63.2 in order to address CVE-2023-45288 (#338)
+- Updated Golang to 1.22.2 and google.golang.org/grpc to v1.63.2 in order to address CVE-2023-45288 (#181)
 
 ## [0.2.5] - 2024-01-23
 
