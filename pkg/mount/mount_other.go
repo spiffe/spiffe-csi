@@ -7,18 +7,14 @@ import (
 	"errors"
 )
 
-func bindMountRO(src, dst string) error {
+func bindMountRW(string, string) error {
 	return errors.New("unsupported on this platform")
 }
 
-func bindMountRW(src, dst string) error {
+func unmount(string) error {
 	return errors.New("unsupported on this platform")
 }
 
-func unmount(path string) error {
-	return errors.New("unsupported on this platform")
-}
-
-func isMountPoint(mountPoint string) (bool, error) {
+func isMountPoint(string) (bool, error) {
 	return false, errors.New("unsupported on this platform")
 }
