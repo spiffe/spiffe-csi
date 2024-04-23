@@ -15,6 +15,14 @@ updates:
       patterns:
         - "sig.k8s.io/*"
   open-pull-requests-limit: 5
+- package-ecosystem: gomod
+  directory: "test/workload"
+  schedule:
+    interval: "daily"
+- package-ecosystem: gomod
+  directory: "example/workload"
+  schedule:
+    interval: "daily"
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule: 
