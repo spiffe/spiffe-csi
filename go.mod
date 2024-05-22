@@ -4,7 +4,7 @@ go 1.22.2
 
 require (
 	github.com/container-storage-interface/spec v1.9.0
-	github.com/go-logr/logr v1.4.1
+	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/zapr v1.3.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
