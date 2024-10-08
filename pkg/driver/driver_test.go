@@ -14,6 +14,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 	"github.com/spiffe/spiffe-csi/internal/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 const (
@@ -303,7 +306,7 @@ func TestNodePublishVolume(t *testing.T) {
 			resp, err := client.NodePublishVolume(context.Background(), req)
 			requireGRPCStatusPrefix(t, err, tt.expectCode, tt.expectMsgPrefix)
 			if err == nil {
-				assert.Equal(t, &csi.NodePublishVolumeResponse{}, resp)
+				assertProtoEqual(t, &csi.NodePublishVolumeResponse{}, resp)
 				assertMounted(t, targetPath, workloadAPISocketDir)
 			} else {
 				assert.Nil(t, resp)
@@ -394,7 +397,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			requireGRPCStatusPrefix(t, err, tt.expectCode, tt.expectMsgPrefix)
 			if err == nil {
 				assertNotMounted(t, targetPath)
-				assert.Equal(t, &csi.NodeUnpublishVolumeResponse{}, resp)
+				assertProtoEqual(t, &csi.NodeUnpublishVolumeResponse{}, resp)
 			} else {
 				assert.Nil(t, resp)
 			}
@@ -517,4 +520,10 @@ func dumpIt(t *testing.T, when, dir string) {
 			return nil
 		})))
 	t.Logf("<<<<<<<<<< DUMPED %s %s", when, dir)
+}
+
+func assertProtoEqual[M proto.Message](t *testing.T, a, b M) {
+	if diff := cmp.Diff(a, b, protocmp.Transform()); diff != "" {
+		require.FailNowf(t, "Proto are not equal", "diff:\n%s\n", diff)
+	}
 }
