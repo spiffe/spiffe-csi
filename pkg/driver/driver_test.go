@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
@@ -452,9 +451,6 @@ func startDriver(t *testing.T) (client, string) {
 	csi.RegisterIdentityServer(s, d)
 	csi.RegisterNodeServer(s, d)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
 	connCh := make(chan *grpc.ClientConn, 1)
 	errCh := make(chan error, 2)
 
@@ -462,10 +458,8 @@ func startDriver(t *testing.T) (client, string) {
 		errCh <- s.Serve(l) // failures to serve will
 	}()
 	go func() {
-		conn, err := grpc.DialContext(ctx, l.Addr().String(),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.FailOnNonTempDialError(true),
-			grpc.WithReturnConnectionError())
+		conn, err := grpc.NewClient(l.Addr().String(),
+			grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			errCh <- err
 		} else {
