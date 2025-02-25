@@ -1,0 +1,13 @@
+name: dco-bypass
+on:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  DCO:
+    runs-on: ubuntu-latest
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    steps:
+      - run: echo "Bypassing DCO check for merge bot"
