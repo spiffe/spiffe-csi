@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 	"github.com/spiffe/spiffe-csi/internal/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +21,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 const (
@@ -303,7 +305,7 @@ func TestNodePublishVolume(t *testing.T) {
 			resp, err := client.NodePublishVolume(context.Background(), req)
 			requireGRPCStatusPrefix(t, err, tt.expectCode, tt.expectMsgPrefix)
 			if err == nil {
-				assert.Equal(t, &csi.NodePublishVolumeResponse{}, resp)
+				assertProtoEqual(t, &csi.NodePublishVolumeResponse{}, resp)
 				assertMounted(t, targetPath, workloadAPISocketDir)
 			} else {
 				assert.Nil(t, resp)
@@ -394,7 +396,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			requireGRPCStatusPrefix(t, err, tt.expectCode, tt.expectMsgPrefix)
 			if err == nil {
 				assertNotMounted(t, targetPath)
-				assert.Equal(t, &csi.NodeUnpublishVolumeResponse{}, resp)
+				assertProtoEqual(t, &csi.NodeUnpublishVolumeResponse{}, resp)
 			} else {
 				assert.Nil(t, resp)
 			}
@@ -449,9 +451,6 @@ func startDriver(t *testing.T) (client, string) {
 	csi.RegisterIdentityServer(s, d)
 	csi.RegisterNodeServer(s, d)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
 	connCh := make(chan *grpc.ClientConn, 1)
 	errCh := make(chan error, 2)
 
@@ -459,10 +458,8 @@ func startDriver(t *testing.T) (client, string) {
 		errCh <- s.Serve(l) // failures to serve will
 	}()
 	go func() {
-		conn, err := grpc.DialContext(ctx, l.Addr().String(),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.FailOnNonTempDialError(true),
-			grpc.WithReturnConnectionError())
+		conn, err := grpc.NewClient(l.Addr().String(),
+			grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			errCh <- err
 		} else {
@@ -517,4 +514,10 @@ func dumpIt(t *testing.T, when, dir string) {
 			return nil
 		})))
 	t.Logf("<<<<<<<<<< DUMPED %s %s", when, dir)
+}
+
+func assertProtoEqual[M proto.Message](t *testing.T, a, b M) {
+	if diff := cmp.Diff(a, b, protocmp.Transform()); diff != "" {
+		require.FailNowf(t, "Proto are not equal", "diff:\n%s\n", diff)
+	}
 }
