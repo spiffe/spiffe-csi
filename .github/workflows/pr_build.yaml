@@ -63,13 +63,10 @@ jobs:
         # Kubernetes, but can go back farther as long as we don't need heroics
         # to pull it off (i.e. kubectl version juggling).
         k8s-version:
-          - v1.29.1
-          - v1.28.6
-          - v1.27.10
-          - v1.26.13
-          - v1.25.16
-          - v1.24.17
-          - v1.23.17
+          - v1.32.2
+          - v1.31.6
+          - v1.30.10
+          - v1.29.14
     steps:
       - name: Checkout
         uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871
