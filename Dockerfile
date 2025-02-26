@@ -1,5 +1,5 @@
 # Build the SPIFFE CSI Driver binary
-FROM --platform=${BUILDPLATFORM} golang:1.22.2-alpine AS base
+FROM --platform=${BUILDPLATFORM} golang:1.24.0-alpine AS base
 WORKDIR /code
 RUN apk --no-cache --update add make
 COPY go.* ./
@@ -12,7 +12,7 @@ COPY . .
 # crane digest tonistiigi/xx:1.1.2
 FROM --platform=${BUILDPLATFORM} tonistiigi/xx@sha256:9dde7edeb9e4a957ce78be9f8c0fbabe0129bf5126933cd3574888f443731cda AS xx
 
-FROM --platform=${BUILDPLATFORM} base as builder
+FROM --platform=${BUILDPLATFORM} base AS builder
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ENV CGO_ENABLED=0
