@@ -1,8 +1,5 @@
 # Build the SPIFFE CSI Driver binary
 FROM --platform=${BUILDPLATFORM} golang:1.22.2-alpine AS base
-ARG GIT_TAG
-ARG GIT_COMMIT
-ARG GIT_DIRTY
 WORKDIR /code
 RUN apk --no-cache --update add make
 COPY go.* ./
@@ -23,7 +20,7 @@ COPY --link --from=xx / /
 RUN xx-go --wrap
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    make GIT_TAG="${GIT_TAG}" GIT_COMMIT="${GIT_COMMIT}" GIT_DIRTY="${GIT_DIRTY}" build
+    make build
 
 # Build a scratch image with just the SPIFFE CSI driver binary
 FROM scratch AS spiffe-csi-driver
