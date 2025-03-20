@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.7] - 2025-03-20
+
+### Changed
+
+- Dependency updates
+
 ## [0.2.6] - 2024-04-10
 
 ### Security
