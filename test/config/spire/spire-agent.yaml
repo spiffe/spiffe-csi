@@ -54,6 +54,7 @@ data:
       socket_path = "/run/spire/sockets/agent.sock"
       trust_bundle_path = "/run/spire/bundle/bundle.crt"
       trust_domain = "test"
+      retry_bootstrap = false
     }
 
     plugins {
