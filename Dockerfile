@@ -1,5 +1,5 @@
 # Build the SPIFFE CSI Driver binary
-FROM --platform=${BUILDPLATFORM} golang:1.24.0-alpine AS base
+FROM --platform=${BUILDPLATFORM} golang:1.24.6-alpine AS base
 WORKDIR /code
 RUN apk --no-cache --update add make
 COPY go.* ./
