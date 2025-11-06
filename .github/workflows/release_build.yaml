@@ -43,7 +43,7 @@ jobs:
       - name: Export images
         run: tar -czvf images.tar.gz *-image.tar
       - name: Archive images
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: images
           path: images.tar.gz
