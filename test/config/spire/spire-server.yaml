@@ -175,6 +175,12 @@ spec:
           args: ["-config", "/run/spire/server/config/server.conf"]
           ports:
             - containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
           volumeMounts:
             - name: spire-config
               mountPath: /run/spire/server/config

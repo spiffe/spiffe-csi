@@ -73,7 +73,7 @@ test:
 
 .PHONY: lint
 lint: $(golangci_lint_bin)
-	@GOLANGCI_LINT_CACHE="$(golangci_lint_cache)" $(golangci_lint_bin) run ./...
+	@GOLANGCI_LINT_CACHE="$(golangci_lint_cache)" GOOS=linux $(golangci_lint_bin) run ./...
 
 $(golangci_lint_bin):
 	@echo "Installing golangci-lint $(golangci_lint_version)..."
