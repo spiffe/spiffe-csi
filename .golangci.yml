@@ -1,26 +1,27 @@
+version: "2"
+
 run:
-  # timeout for analysis, e.g. 30s, 5m, default is 1m
-  deadline: 10m
+  timeout: 10m
 
 linters:
   enable:
     - bodyclose
     - durationcheck
     - errorlint
-    - goimports
     - revive
     - gosec
     - nakedret
     - misspell
     - nolintlint
-    - nakedret
     - unconvert
     - unparam
     - whitespace
     - gocritic
-    - nolintlint
 
-linters-settings:
-  revive:
-    # minimal confidence for issues, default is 0.8
-    confidence: 0.0
+  settings:
+    revive:
+      confidence: 0.0
+
+formatters:
+  enable:
+    - goimports
