@@ -94,7 +94,7 @@ var reOctal = regexp.MustCompile(`\\([0-7]{3})`)
 func unescapeOctal(s string) string {
 	return reOctal.ReplaceAllStringFunc(s, func(oct string) string {
 		// cannot fail due to regex constraints
-		r, _ := strconv.ParseUint(oct[1:], 8, 64)
+		r, _ := strconv.ParseUint(oct[1:], 8, 8)
 		return string([]byte{byte(r)})
 	})
 }
