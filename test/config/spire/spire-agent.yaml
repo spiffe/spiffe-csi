@@ -54,7 +54,14 @@ data:
       socket_path = "/run/spire/sockets/agent.sock"
       trust_bundle_path = "/run/spire/bundle/bundle.crt"
       trust_domain = "test"
-      retry_bootstrap = false
+    }
+
+    health_checks {
+      listener_enabled = true
+      bind_address = "0.0.0.0"
+      bind_port = "8082"
+      live_path = "/live"
+      ready_path = "/ready"
     }
 
     plugins {
@@ -104,6 +111,12 @@ spec:
           image: ghcr.io/spiffe/spire-agent:nightly
           imagePullPolicy: IfNotPresent
           args: ["-config", "/run/spire/config/agent.conf"]
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 5
           volumeMounts:
             - name: spire-config
               mountPath: /run/spire/config

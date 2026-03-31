@@ -1,5 +1,7 @@
+// Package logkeys defines structured log field keys used across the CSI driver.
 package logkeys
 
+// Log field keys for structured logging.
 const (
 	CSISocketPath        = "csiSocketPath"
 	FullMethod           = "fullMethod"

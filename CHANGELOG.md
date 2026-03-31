@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.9] - 2025-11-17
+
+### Changed
+
+- Dependency updates
+
 ## [0.2.8] - 2025-08-19
 
 ### Changed

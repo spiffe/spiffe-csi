@@ -1,3 +1,4 @@
+// Package mount provides filesystem mount operations for the CSI driver.
 package mount
 
 // BindMountRW performs a read-write bind mount from root to mountPoint

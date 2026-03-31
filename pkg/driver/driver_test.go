@@ -237,7 +237,7 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			desc: "target path already exists",
 			mungeTargetPath: func(t *testing.T, targetPath string) {
-				require.NoError(t, os.Mkdir(targetPath, 0755))
+				require.NoError(t, os.Mkdir(targetPath, 0750))
 			},
 			expectCode: codes.OK,
 		},
@@ -375,7 +375,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			targetPath := filepath.Join(targetPathBase, "target-path")
 
 			// Write out the meta file to simulate a successful mount
-			require.NoError(t, os.Mkdir(targetPath, 0755))
+			require.NoError(t, os.Mkdir(targetPath, 0750))
 			require.NoError(t, writeMeta(targetPath, workloadAPISocketDir))
 
 			if tt.mungeTargetPath != nil {
@@ -444,7 +444,7 @@ func startDriver(t *testing.T) (client, string) {
 
 	l, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
-	t.Cleanup(func() { l.Close() })
+	t.Cleanup(func() { _ = l.Close() })
 	s := grpc.NewServer()
 	t.Cleanup(s.Stop)
 
@@ -470,7 +470,7 @@ func startDriver(t *testing.T) (client, string) {
 	var conn *grpc.ClientConn
 	select {
 	case conn = <-connCh:
-		t.Cleanup(func() { conn.Close() })
+		t.Cleanup(func() { _ = conn.Close() })
 	case err := <-errCh:
 		require.NoError(t, err)
 	}
