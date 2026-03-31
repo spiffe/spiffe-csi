@@ -73,7 +73,7 @@ jobs:
       - name: Install regctl
         uses: regclient/actions/regctl-installer@f07124ffba4b0cbf96b2a666d481ed9d44b5e7e4 # main
       - name: Download archived images
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: images
           path: .
