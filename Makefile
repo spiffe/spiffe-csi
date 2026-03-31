@@ -36,7 +36,7 @@ PLATFORMS ?= linux/amd64,linux/arm64
 
 build_dir := $(DIR)/.build/$(os1)-$(arch1)
 
-golangci_lint_version = v1.64.5
+golangci_lint_version = v2.11.4
 golangci_lint_dir = $(build_dir)/golangci_lint/$(golangci_lint_version)
 golangci_lint_bin = $(golangci_lint_dir)/golangci-lint
 golangci_lint_cache = $(golangci_lint_dir)/cache
@@ -75,7 +75,7 @@ test:
 
 .PHONY: lint
 lint: $(golangci_lint_bin)
-	@GOLANGCI_LINT_CACHE="$(golangci_lint_cache)" $(golangci_lint_bin) run ./...
+	@GOLANGCI_LINT_CACHE="$(golangci_lint_cache)" GOOS=linux $(golangci_lint_bin) run ./...
 
 $(golangci_lint_bin):
 	@echo "Installing golangci-lint $(golangci_lint_version)..."

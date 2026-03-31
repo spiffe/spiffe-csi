@@ -1,3 +1,4 @@
+// Package driver implements the SPIFFE CSI ephemeral-inline volume driver.
 package driver
 
 import (
@@ -61,6 +62,7 @@ func New(config Config) (*Driver, error) {
 // Identity Server
 /////////////////////////////////////////////////////////////////////////////
 
+// GetPluginInfo returns the name and version of the plugin.
 func (d *Driver) GetPluginInfo(context.Context, *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	return &csi.GetPluginInfoResponse{
 		Name:          d.pluginName,
@@ -68,11 +70,13 @@ func (d *Driver) GetPluginInfo(context.Context, *csi.GetPluginInfoRequest) (*csi
 	}, nil
 }
 
+// GetPluginCapabilities returns the capabilities of this plugin.
 func (d *Driver) GetPluginCapabilities(context.Context, *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	// Only the Node server is implemented. No other capabilities are available.
 	return &csi.GetPluginCapabilitiesResponse{}, nil
 }
 
+// Probe returns the health of the plugin.
 func (d *Driver) Probe(context.Context, *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	return &csi.ProbeResponse{}, nil
 }
@@ -81,6 +85,7 @@ func (d *Driver) Probe(context.Context, *csi.ProbeRequest) (*csi.ProbeResponse, 
 // Node Server implementation
 /////////////////////////////////////////////////////////////////////////////
 
+// NodePublishVolume mounts the workload API socket directory into the target path.
 func (d *Driver) NodePublishVolume(_ context.Context, req *csi.NodePublishVolumeRequest) (_ *csi.NodePublishVolumeResponse, err error) {
 	ephemeralMode := req.GetVolumeContext()["csi.storage.k8s.io/ephemeral"]
 
@@ -121,7 +126,7 @@ func (d *Driver) NodePublishVolume(_ context.Context, req *csi.NodePublishVolume
 	}
 
 	// Create the target path (required by CSI interface)
-	if err := os.Mkdir(req.TargetPath, 0777); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(req.TargetPath, 0750); err != nil && !os.IsExist(err) {
 		return nil, status.Errorf(codes.Internal, "unable to create target path %q: %v", req.TargetPath, err)
 	}
 
@@ -139,6 +144,7 @@ func (d *Driver) NodePublishVolume(_ context.Context, req *csi.NodePublishVolume
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
+// NodeUnpublishVolume unmounts the volume from the target path.
 func (d *Driver) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVolumeRequest) (_ *csi.NodeUnpublishVolumeResponse, err error) {
 	log := d.log.WithValues(
 		logkeys.VolumeID, req.VolumeId,
@@ -178,6 +184,7 @@ func (d *Driver) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVo
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
+// NodeGetCapabilities returns the capabilities of the node service.
 func (d *Driver) NodeGetCapabilities(context.Context, *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: []*csi.NodeServiceCapability{
@@ -199,6 +206,7 @@ func (d *Driver) NodeGetCapabilities(context.Context, *csi.NodeGetCapabilitiesRe
 	}, nil
 }
 
+// NodeGetInfo returns info about the node.
 func (d *Driver) NodeGetInfo(context.Context, *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	return &csi.NodeGetInfoResponse{
 		NodeId:            d.nodeID,
@@ -206,6 +214,7 @@ func (d *Driver) NodeGetInfo(context.Context, *csi.NodeGetInfoRequest) (*csi.Nod
 	}, nil
 }
 
+// NodeGetVolumeStats returns the health condition of a volume.
 func (d *Driver) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	log := d.log.WithValues(
 		logkeys.VolumeID, req.VolumeId,

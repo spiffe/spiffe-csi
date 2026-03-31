@@ -1,3 +1,4 @@
+// Package main is the entry point for the SPIFFE CSI driver.
 package main
 
 import (
