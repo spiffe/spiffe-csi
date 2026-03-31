@@ -48,7 +48,7 @@ func enumerateMounts() ([]mountInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to open mount info: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var mounts []mountInfo
 	scanner := bufio.NewScanner(f)
@@ -95,6 +95,6 @@ func unescapeOctal(s string) string {
 	return reOctal.ReplaceAllStringFunc(s, func(oct string) string {
 		// cannot fail due to regex constraints
 		r, _ := strconv.ParseUint(oct[1:], 8, 64)
-		return string(rune(r))
+		return string([]byte{byte(r)})
 	})
 }
