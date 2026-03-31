@@ -1,3 +1,4 @@
+// Package server provides the gRPC server for the CSI driver.
 package server
 
 import (
@@ -13,17 +14,20 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Config holds the configuration for the gRPC server.
 type Config struct {
 	Log           logr.Logger
 	CSISocketPath string
 	Driver        Driver
 }
 
+// Driver is the interface that the CSI driver must implement.
 type Driver interface {
 	csi.IdentityServer
 	csi.NodeServer
 }
 
+// Run starts the gRPC server and blocks until it exits.
 func Run(config Config) error {
 	if config.CSISocketPath == "" {
 		return errors.New("CSI socket path is required")

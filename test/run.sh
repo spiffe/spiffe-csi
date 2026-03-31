@@ -150,6 +150,11 @@ deploy-spire() {
     "${KUBECTL}" apply -k "${DIR}"/config/spire
     echo "Waiting for SPIRE server rollout..."
     "${KUBECTL}" rollout status -w --timeout=1m -nspire-system deployment/spire-server
+    echo "Waiting for SPIRE bundle to be published to ConfigMap..."
+    until "${KUBECTL}" get configmap spire-bundle -nspire-system -o jsonpath='{.data.bundle\.crt}' 2>/dev/null | grep -q .; do
+        sleep 1
+    done
+    echo "SPIRE bundle is ready."
     echo "Waiting for SPIRE agent rollout..."
     "${KUBECTL}" rollout status -w --timeout=1m -nspire-system daemonset/spire-agent
     echo "Waiting for SPIFFE CSI Driver rollout..."

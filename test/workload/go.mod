@@ -1,6 +1,6 @@
 module workload
 
-go 1.24.9
+go 1.26.1
 
 require github.com/spiffe/go-spiffe/v2 v2.6.0
 

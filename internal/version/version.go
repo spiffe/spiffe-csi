@@ -1,3 +1,4 @@
+// Package version provides the build version of the binary.
 package version
 
 import (
@@ -14,6 +15,7 @@ func init() {
 	version = bi.Main.Version
 }
 
+// Version returns the build version of the binary.
 func Version() string {
 	return version
 }
