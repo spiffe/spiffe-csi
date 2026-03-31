@@ -59,6 +59,8 @@ spiffe-csi-driver-image.tar: Dockerfile FORCE | container-builder
 		--platform $(PLATFORMS) \
 		--target spiffe-csi-driver \
 		-o type=oci,dest=$@ \
+		--provenance=false \
+		--sbom=false \
 		.
 
 .PHONY: build
