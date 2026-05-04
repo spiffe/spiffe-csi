@@ -3,6 +3,7 @@ package mount
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -22,6 +23,10 @@ var (
 	procMountInfo = "/proc/self/mountinfo"
 )
 
+// mountPointIdx is the slice index of the mount point in a parsed mountinfo
+// record. proc(5) "/proc/[pid]/mountinfo" documents it as field 5.
+const mountPointIdx = 4
+
 func bindMountRW(root, mountPoint string) error {
 	return unix.Mount(root, mountPoint, "none", msBind, "")
 }
@@ -31,62 +36,34 @@ func unmount(mountPoint string) error {
 }
 
 func isMountPoint(mountPoint string) (bool, error) {
-	mounts, err := enumerateMounts()
+	f, err := os.Open(procMountInfo)
 	if err != nil {
-		return false, fmt.Errorf("failed to enumerate bind mounts: %w", err)
+		return false, fmt.Errorf("unable to open mount info: %w", err)
 	}
-	for _, mount := range mounts {
-		if mount.MountPoint == mountPoint {
+	defer func() { _ = f.Close() }()
+	return isMountPointInReader(f, mountPoint)
+}
+
+// isMountPointInReader scans mountinfo-formatted records from r and reports
+// whether any record's mount point (field 5) equals mountPoint. It returns on
+// the first match so the per-call working set is independent of the host's
+// total mount count.
+func isMountPointInReader(r io.Reader, mountPoint string) (bool, error) {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) <= mountPointIdx {
+			continue
+		}
+		if unescapeOctal(fields[mountPointIdx]) == mountPoint {
 			return true, nil
 		}
 	}
-	return false, nil
-}
-
-func enumerateMounts() ([]mountInfo, error) {
-	f, err := os.Open(procMountInfo)
-	if err != nil {
-		return nil, fmt.Errorf("unable to open mount info: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-
-	var mounts []mountInfo
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		mount, err := parseMountInfo(scanner.Text())
-		if err != nil {
-			continue
-		}
-		mounts = append(mounts, mount)
-	}
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("failed to scan mount info: %w", err)
+		return false, fmt.Errorf("failed to scan mount info: %w", err)
 	}
-	return mounts, nil
-}
-
-type mountInfo struct {
-	MountID    string
-	ParentID   string
-	DevID      string
-	Root       string
-	MountPoint string
-}
-
-func parseMountInfo(line string) (mountInfo, error) {
-	const minColumns = 5
-	fields := strings.Fields(line)
-	if len(fields) < minColumns {
-		return mountInfo{}, fmt.Errorf("mount info does not have at least %d columns", minColumns)
-	}
-
-	return mountInfo{
-		MountID:    fields[0],
-		ParentID:   fields[1],
-		DevID:      fields[2],
-		Root:       unescapeOctal(fields[3]),
-		MountPoint: unescapeOctal(fields[4]),
-	}, nil
+	return false, nil
 }
 
 var reOctal = regexp.MustCompile(`\\([0-7]{3})`)
