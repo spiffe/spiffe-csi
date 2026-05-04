@@ -1,6 +1,13 @@
 # Changelog
 
-## [0.2.10] - 2026-01-01
+## [0.2.11] - 2026-05-04
+
+### Changed
+
+- Improved `isMountPoint` to scan `/proc/self/mountinfo` line-by-line with early-exit on first match, reducing per-call memory usage by ~64% under load (#323)
+- Dependency updates
+
+## [0.2.10] - 2026-04-01
 
 ### Changed
 
