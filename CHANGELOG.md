@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Reduced memory usage when checking CSI volume mounts on nodes with many mounted volumes (#323)
+- Reduced per-call memory usage when checking CSI volume mounts, most noticeable on nodes with many mounts (#323)
 - Dependency updates
 
 ## [0.2.10] - 2026-04-01
