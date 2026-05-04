@@ -1,6 +1,13 @@
 # Changelog
 
-## [0.2.10] - 2026-01-01
+## [0.2.11] - 2026-05-04
+
+### Changed
+
+- Reduced per-call memory usage when checking CSI volume mounts, most noticeable on nodes with many mounts (#323)
+- Dependency updates
+
+## [0.2.10] - 2026-04-01
 
 ### Changed
 
