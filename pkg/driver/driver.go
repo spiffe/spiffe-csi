@@ -130,6 +130,14 @@ func (d *Driver) NodePublishVolume(_ context.Context, req *csi.NodePublishVolume
 		return nil, status.Errorf(codes.Internal, "unable to create target path %q: %v", req.TargetPath, err)
 	}
 
+	// Return if the target path is already mounted
+	if mounted, mountErr := isMountPoint(req.TargetPath); mountErr != nil {
+		return nil, status.Errorf(codes.Internal, "unable to verify mount point %q: %v", req.TargetPath, mountErr)
+	} else if mounted {
+		log.Info("Volume already published")
+		return &csi.NodePublishVolumeResponse{}, nil
+	}
+
 	// Ideally the volume is writable by the host to enable, for example,
 	// manipulation of file attributes by SELinux. However, the volume MUST NOT
 	// be writable by workload containers. We enforce that the CSI volume is

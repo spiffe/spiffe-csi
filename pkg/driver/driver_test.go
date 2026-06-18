@@ -42,7 +42,7 @@ func init() {
 	unmount = func(dst string) error {
 		return os.Remove(metaPath(dst))
 	}
-	isMountPoint = func(string) (bool, error) {
+	isMountPoint = func(path string) (bool, error) {
 		if testDescription == unmountFailureTest {
 			return true, nil
 		}
@@ -51,7 +51,9 @@ func init() {
 			return false, fmt.Errorf("mock invalid mount point")
 		}
 
-		return true, nil
+		// Check if the meta file exists to simulate a real mount check.
+		_, err := os.Stat(metaPath(path))
+		return err == nil, nil
 	}
 }
 
@@ -313,6 +315,52 @@ func TestNodePublishVolume(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNodePublishVolumeIdempotent(t *testing.T) {
+	// calling NodePublishVolume twice on the same target path
+	// must not create duplicate mounts.
+	originalBindMountRW := bindMountRW
+	mountCalls := 0
+	bindMountRW = func(src, dst string) error {
+		mountCalls++
+		return originalBindMountRW(src, dst)
+	}
+	t.Cleanup(func() {
+		bindMountRW = originalBindMountRW
+	})
+
+	client, workloadAPISocketDir := startDriver(t)
+
+	targetPathBase := t.TempDir()
+	targetPath := filepath.Join(targetPathBase, "target-path")
+
+	req := &csi.NodePublishVolumeRequest{
+		VolumeId:   "volumeID",
+		TargetPath: targetPath,
+		Readonly:   true,
+		VolumeCapability: &csi.VolumeCapability{
+			AccessType: &csi.VolumeCapability_Mount{},
+			AccessMode: &csi.VolumeCapability_AccessMode{},
+		},
+		VolumeContext: map[string]string{
+			"csi.storage.k8s.io/ephemeral": "true",
+		},
+	}
+
+	// First call: should mount
+	resp, err := client.NodePublishVolume(context.Background(), req)
+	require.NoError(t, err)
+	assertProtoEqual(t, &csi.NodePublishVolumeResponse{}, resp)
+	assertMounted(t, targetPath, workloadAPISocketDir)
+	assert.Equal(t, 1, mountCalls, "first publish should mount once")
+
+	// Second call should succeed without re-mounting
+	resp, err = client.NodePublishVolume(context.Background(), req)
+	require.NoError(t, err)
+	assertProtoEqual(t, &csi.NodePublishVolumeResponse{}, resp)
+	assertMounted(t, targetPath, workloadAPISocketDir)
+	assert.Equal(t, 1, mountCalls, "second publish should not re-mount")
 }
 
 func TestNodeUnpublishVolume(t *testing.T) {
