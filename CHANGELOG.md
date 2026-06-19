@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.12] - 2026-06-19
+
+### Fixed
+
+- NodePublishVolume now returns success when the target path is already mounted instead of bind mounting it again, preventing duplicate mount accumulation on kubelet restart (#332)
+
+### Changed
+
+- Updated Go to 1.26.4 (#343)
+- Dependency updates
+
 ## [0.2.11] - 2026-05-04
 
 ### Changed
