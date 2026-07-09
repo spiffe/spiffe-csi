@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.13] - 2026-07-09
+
+### Security
+
+- Updated Go to 1.26.5 to address CVE-2026-42505 and golang.org/x/net to v0.55.0 to address CVE-2026-33814 and related advisories (#355)
+
+### Changed
+
+- Dependency updates
+
 ## [0.2.12] - 2026-06-19
 
 ### Fixed
