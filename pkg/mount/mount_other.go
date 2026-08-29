@@ -11,7 +11,15 @@ func bindMountRW(string, string) error {
 	return errors.New("unsupported on this platform")
 }
 
+func bindMountRecursiveRW(string, string) error {
+	return errors.New("unsupported on this platform")
+}
+
 func unmount(string) error {
+	return errors.New("unsupported on this platform")
+}
+
+func unmountDetach(string) error {
 	return errors.New("unsupported on this platform")
 }
 

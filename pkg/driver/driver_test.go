@@ -569,3 +569,66 @@ func assertProtoEqual[M proto.Message](t *testing.T, a, b M) {
 		require.FailNowf(t, "Proto are not equal", "diff:\n%s\n", diff)
 	}
 }
+
+// The recursive bind and the detaching unmount are one setting, not two: a
+// recursive bind can leave the target with child mounts, and unmounting a mount
+// that has children fails with EBUSY. Assert that each setting picks the pair
+// that goes together, since getting one without the other wedges teardown.
+func TestRecursiveBindSelectsMatchingMountAndUnmount(t *testing.T) {
+	for _, tt := range []struct {
+		desc          string
+		recursiveBind bool
+		wantBind      string
+		wantUnmount   string
+	}{
+		{desc: "off by default", recursiveBind: false, wantBind: "plain", wantUnmount: "plain"},
+		{desc: "on", recursiveBind: true, wantBind: "recursive", wantUnmount: "detach"},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			var gotBind, gotUnmount string
+
+			restore := func(b, br func(string, string) error, u, ud func(string) error) func() {
+				return func() { bindMountRW, bindMountRecursiveRW, unmount, unmountDetach = b, br, u, ud }
+			}(bindMountRW, bindMountRecursiveRW, unmount, unmountDetach)
+			t.Cleanup(restore)
+
+			bindMountRW = func(src, dst string) error { gotBind = "plain"; return writeMeta(dst, src) }
+			bindMountRecursiveRW = func(src, dst string) error { gotBind = "recursive"; return writeMeta(dst, src) }
+			unmount = func(dst string) error { gotUnmount = "plain"; return os.Remove(metaPath(dst)) }
+			unmountDetach = func(dst string) error { gotUnmount = "detach"; return os.Remove(metaPath(dst)) }
+
+			d, err := New(Config{
+				Log:                  logr.Discard(),
+				NodeID:               testNodeID,
+				PluginName:           "csi.spiffe.io",
+				WorkloadAPISocketDir: t.TempDir(),
+				RecursiveBind:        tt.recursiveBind,
+			})
+			require.NoError(t, err)
+
+			targetPath := filepath.Join(t.TempDir(), "target")
+			_, err = d.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
+				VolumeId:   "volumeID",
+				TargetPath: targetPath,
+				// Set explicitly: this call does not go through gRPC, so
+				// nothing materialises the inner message the way a round trip
+				// through protobuf does for the other tests.
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}},
+					AccessMode: &csi.VolumeCapability_AccessMode{},
+				},
+				Readonly:      true,
+				VolumeContext: map[string]string{"csi.storage.k8s.io/ephemeral": "true"},
+			})
+			require.NoError(t, err)
+			require.Equal(t, tt.wantBind, gotBind, "wrong bind mount for recursiveBind=%v", tt.recursiveBind)
+
+			_, err = d.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
+				VolumeId:   "volumeID",
+				TargetPath: targetPath,
+			})
+			require.NoError(t, err)
+			require.Equal(t, tt.wantUnmount, gotUnmount, "wrong unmount for recursiveBind=%v", tt.recursiveBind)
+		})
+	}
+}
