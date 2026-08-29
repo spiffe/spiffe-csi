@@ -18,9 +18,11 @@ import (
 
 var (
 	// We replace these in tests since bind mounting generally requires root.
-	bindMountRW  = mount.BindMountRW
-	unmount      = mount.Unmount
-	isMountPoint = mount.IsMountPoint
+	bindMountRW          = mount.BindMountRW
+	bindMountRecursiveRW = mount.BindMountRecursiveRW
+	unmount              = mount.Unmount
+	unmountDetach        = mount.UnmountDetach
+	isMountPoint         = mount.IsMountPoint
 )
 
 // Config is the configuration for the driver
@@ -29,6 +31,18 @@ type Config struct {
 	NodeID               string
 	PluginName           string
 	WorkloadAPISocketDir string
+
+	// RecursiveBind publishes anything mounted beneath the Workload API socket
+	// directory along with the directory itself, and keeps tracking it as it is
+	// mounted and unmounted. Off by default, since it changes what a workload
+	// sees and how the volume is torn down.
+	//
+	// It is needed when the socket directory is not a plain directory holding a
+	// socket but a mount point in its own right, or contains one: with a plain
+	// bind a workload sees the underlying directory and never the filesystem
+	// mounted on it, and a filesystem replaced while the workload is running is
+	// never picked up.
+	RecursiveBind bool
 }
 
 // Driver is the ephemeral-inline CSI driver implementation
@@ -40,6 +54,7 @@ type Driver struct {
 	nodeID               string
 	pluginName           string
 	workloadAPISocketDir string
+	recursiveBind        bool
 }
 
 // New creates a new driver with the given config
@@ -55,6 +70,7 @@ func New(config Config) (*Driver, error) {
 		nodeID:               config.NodeID,
 		pluginName:           config.PluginName,
 		workloadAPISocketDir: config.WorkloadAPISocketDir,
+		recursiveBind:        config.RecursiveBind,
 	}, nil
 }
 
@@ -143,7 +159,11 @@ func (d *Driver) NodePublishVolume(_ context.Context, req *csi.NodePublishVolume
 	// be writable by workload containers. We enforce that the CSI volume is
 	// marked read-only above, instructing the kubelet to mount it read-only
 	// into containers, while we mount the volume read-write to the host.
-	if err := bindMountRW(d.workloadAPISocketDir, req.TargetPath); err != nil {
+	bindMount := bindMountRW
+	if d.recursiveBind {
+		bindMount = bindMountRecursiveRW
+	}
+	if err := bindMount(d.workloadAPISocketDir, req.TargetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "unable to mount %q: %v", req.TargetPath, err)
 	}
 
@@ -177,7 +197,13 @@ func (d *Driver) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVo
 	if ok, err := isMountPoint(req.TargetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "unable to verify mount point %q: %v", req.TargetPath, err)
 	} else if ok {
-		if err := unmount(req.TargetPath); err != nil {
+		// A recursive bind can leave the target with child mounts, which a
+		// plain unmount refuses with EBUSY, so the two settings move together.
+		unmountTarget := unmount
+		if d.recursiveBind {
+			unmountTarget = unmountDetach
+		}
+		if err := unmountTarget(req.TargetPath); err != nil {
 			return nil, status.Errorf(codes.Internal, "unable to unmount %q: %v", req.TargetPath, err)
 		}
 	}

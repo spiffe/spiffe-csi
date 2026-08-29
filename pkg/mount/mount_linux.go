@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	msBind uintptr = 4096 // LINUX MS_BIND
+	msBind uintptr = 4096  // LINUX MS_BIND
+	msRec  uintptr = 16384 // LINUX MS_REC
 )
 
 var (
@@ -31,8 +32,23 @@ func bindMountRW(root, mountPoint string) error {
 	return unix.Mount(root, mountPoint, "none", msBind, "")
 }
 
+// bindMountRecursiveRW binds root to mountPoint along with anything mounted
+// beneath it. A plain bind copies only the directory, so a filesystem already
+// mounted under root at the time of the bind is not carried across, and one
+// mounted afterwards never appears.
+func bindMountRecursiveRW(root, mountPoint string) error {
+	return unix.Mount(root, mountPoint, "none", msBind|msRec, "")
+}
+
 func unmount(mountPoint string) error {
 	return unix.Unmount(mountPoint, 0)
+}
+
+// unmountDetach detaches mountPoint and anything mounted beneath it. A plain
+// unmount of a mount that has children fails with EBUSY, which is why this is
+// the counterpart of bindMountRecursiveRW rather than an independent choice.
+func unmountDetach(mountPoint string) error {
+	return unix.Unmount(mountPoint, unix.MNT_DETACH)
 }
 
 func isMountPoint(mountPoint string) (bool, error) {
