@@ -37,7 +37,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@39bf30ced4be9d147faaabbde2682e9725fb8bd1 # main
+        uses: regclient/actions/regctl-installer@ba687069a65d03e9214808f16f3f0b3933c2048b # main
       - name: Build image
         run: make docker-build
       - name: Export images
@@ -71,7 +71,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@39bf30ced4be9d147faaabbde2682e9725fb8bd1 # main
+        uses: regclient/actions/regctl-installer@ba687069a65d03e9214808f16f3f0b3933c2048b # main
       - name: Download archived images
         uses: actions/download-artifact@v8
         with:
@@ -101,7 +101,7 @@ jobs:
         with:
           cosign-release: v2.6.3
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@39bf30ced4be9d147faaabbde2682e9725fb8bd1 # main
+        uses: regclient/actions/regctl-installer@ba687069a65d03e9214808f16f3f0b3933c2048b # main
       - name: Download archived images
         uses: actions/download-artifact@v8
         with:
