@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/spiffe/spiffe-csi/internal/version"
 	"github.com/spiffe/spiffe-csi/pkg/driver"
@@ -21,6 +20,7 @@ var (
 	csiSocketPathFlag        = flag.String("csi-socket-path", "/spiffe-csi/csi.sock", "Path to the CSI socket")
 	pluginNameFlag           = flag.String("plugin-name", "csi.spiffe.io", "Plugin name to register")
 	workloadAPISocketDirFlag = flag.String("workload-api-socket-dir", "", "Path to the Workload API socket directory")
+	logFormatFlag            = flag.String("log-format", "text", "Log format: text or json")
 )
 
 func main() {
@@ -33,13 +33,12 @@ func main() {
 	}
 	flag.Parse()
 
-	var log logr.Logger
-	zapLog, err := zap.NewDevelopment()
+	zapLog, err := newZapLogger(*logFormatFlag)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to set up logger: %v", err)
+		fmt.Fprintf(os.Stderr, "Unable to set up logger: %v\n", err)
 		os.Exit(1)
 	}
-	log = zapr.NewLogger(zapLog)
+	log := zapr.NewLogger(zapLog)
 
 	nodeID := getNodeIDFromFlags()
 
@@ -72,6 +71,17 @@ func main() {
 		os.Exit(1)
 	}
 	log.Info("Done")
+}
+
+func newZapLogger(format string) (*zap.Logger, error) {
+	switch format {
+	case "text":
+		return zap.NewDevelopment()
+	case "json":
+		return zap.NewProduction()
+	default:
+		return nil, fmt.Errorf("invalid log-format %q: must be text or json", format)
+	}
 }
 
 func getNodeIDFromFlags() string {
