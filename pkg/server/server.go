@@ -59,7 +59,7 @@ type rpcLogger struct {
 	Log logr.Logger
 }
 
-func (l rpcLogger) UnaryRPCLogger(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func (l rpcLogger) UnaryRPCLogger(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	log := l.Log.WithValues(logkeys.FullMethod, info.FullMethod)
 	resp, err := handler(ctx, req)
 	if err != nil {
@@ -70,7 +70,7 @@ func (l rpcLogger) UnaryRPCLogger(ctx context.Context, req interface{}, info *gr
 	return resp, err
 }
 
-func (l rpcLogger) StreamRPCLogger(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+func (l rpcLogger) StreamRPCLogger(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	log := l.Log.WithValues(logkeys.FullMethod, info.FullMethod)
 	err := handler(srv, ss)
 	if err != nil {

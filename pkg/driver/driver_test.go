@@ -456,14 +456,14 @@ func registerTestDescription(desc string) {
 	testDescription = desc
 }
 
-func requireGRPCStatusPrefix(tb testing.TB, err error, code codes.Code, msgPrefix string, msgAndArgs ...interface{}) {
+func requireGRPCStatusPrefix(tb testing.TB, err error, code codes.Code, msgPrefix string, msgAndArgs ...any) {
 	st := status.Convert(err)
 	if code != st.Code() || !strings.HasPrefix(st.Message(), msgPrefix) {
 		require.Fail(tb, fmt.Sprintf("Status code=%q msg=%q does not match code=%q with msg prefix %q", st.Code(), st.Message(), code, msgPrefix), msgAndArgs...)
 	}
 }
 
-func requireProtoEqual(tb testing.TB, expected, actual interface{}, msgAndArgs ...interface{}) {
+func requireProtoEqual(tb testing.TB, expected, actual any, msgAndArgs ...any) {
 	// The CSI spec codegen uses the old proto package, which doesn't have
 	// good comparison support, so just render the structs as json and
 	// compare.

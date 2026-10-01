@@ -87,7 +87,7 @@ func BenchmarkIsMountPoint(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			f, err := os.CreateTemp(b.TempDir(), "mountinfo")
 			require.NoError(b, err)
-			for i := 0; i < total; i++ {
+			for i := range total {
 				mp := fmt.Sprintf(
 					"/var/lib/kubelet/pods/pod-%d/volumes/kubernetes.io~csi/spiffe/mount",
 					i,
