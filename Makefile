@@ -85,7 +85,7 @@ $(golangci_lint_bin):
 	@rm -rf $(dir $(golangci_lint_dir))
 	@mkdir -p $(golangci_lint_dir)
 	@mkdir -p $(golangci_lint_cache)
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(golangci_lint_dir) $(golangci_lint_version)
+	@curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(golangci_lint_dir) $(golangci_lint_version)
 
 .PHONY: load-images
 load-images: $(addsuffix -image.tar,$(BINARIES))
