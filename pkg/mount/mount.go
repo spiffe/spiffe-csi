@@ -50,3 +50,9 @@ func HasChildMounts(mountPoint string) (bool, error) {
 func IsSharedMount(path string) (bool, error) {
 	return isSharedMount(path)
 }
+
+// IsSlaveMount returns whether the mount that path lives on is a slave, so that
+// mounts and unmounts from its master propagate into it.
+func IsSlaveMount(path string) (bool, error) {
+	return isSlaveMount(path)
+}

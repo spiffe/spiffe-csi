@@ -26,6 +26,7 @@ var (
 	hasChildMounts       = mount.HasChildMounts
 	isSharedMount        = mount.IsSharedMount
 	makeRSlave           = mount.MakeRSlave
+	isSlaveMount         = mount.IsSlaveMount
 )
 
 // Config is the configuration for the driver
@@ -48,7 +49,12 @@ type Config struct {
 	//
 	// New makes the driver's own view of the socket directory a slave mount,
 	// so the directory must be a mount point of its own, such as a volume.
-	// Mount it HostToContainer, so it still receives the host's mounts.
+	// It must be mounted HostToContainer, so it still receives the host's
+	// mounts; New refuses one that receives none.
+	//
+	// Read-only volumes only cover their top: anything mounted beneath the
+	// socket directory reaches every workload with its own writability. See
+	// "Recursive Bind" in the README.
 	RecursiveBind bool
 }
 
@@ -95,6 +101,16 @@ func New(config Config) (*Driver, error) {
 		}
 		if shared {
 			return nil, fmt.Errorf("recursive bind requires the workload API socket directory %q not to be on a shared mount, and it still is after making it a slave", config.WorkloadAPISocketDir)
+		}
+		// Still a slave means the directory receives the host's mounts. A
+		// private one, as a volume without HostToContainer is, never does, so
+		// the driver would only ever publish what was mounted when it started.
+		slave, err := isSlaveMount(config.WorkloadAPISocketDir)
+		if err != nil {
+			return nil, fmt.Errorf("unable to check mount propagation of the workload API socket directory: %w", err)
+		}
+		if !slave {
+			return nil, fmt.Errorf("recursive bind requires the workload API socket directory %q to receive mounts from the host, and it receives none; mount it HostToContainer", config.WorkloadAPISocketDir)
 		}
 	}
 	return &Driver{

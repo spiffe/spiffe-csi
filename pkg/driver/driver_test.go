@@ -52,6 +52,9 @@ func init() {
 	makeRSlave = func(string) error {
 		return nil
 	}
+	isSlaveMount = func(string) (bool, error) {
+		return true, nil
+	}
 	isMountPoint = func(path string) (bool, error) {
 		if testDescription == unmountFailureTest {
 			return true, nil
@@ -98,13 +101,29 @@ func TestNew(t *testing.T) {
 		slaveErr      error
 		shared        bool
 		checkErr      error
+		private       bool
+		slaveCheckErr error
 		wantCalls     []string
 		wantErr       string
 	}{
 		{
 			desc:          "recursive bind makes the source a slave, then checks it",
 			recursiveBind: true,
-			wantCalls:     []string{"makeRSlave", "isSharedMount"},
+			wantCalls:     []string{"makeRSlave", "isSharedMount", "isSlaveMount"},
+		},
+		{
+			desc:          "recursive bind from a source that receives no mounts",
+			recursiveBind: true,
+			private:       true,
+			wantCalls:     []string{"makeRSlave", "isSharedMount", "isSlaveMount"},
+			wantErr:       "receives none; mount it HostToContainer",
+		},
+		{
+			desc:          "recursive bind with slave state unknown",
+			recursiveBind: true,
+			slaveCheckErr: errors.New("oh no"),
+			wantCalls:     []string{"makeRSlave", "isSharedMount", "isSlaveMount"},
+			wantErr:       "unable to check mount propagation",
 		},
 		{
 			desc:          "recursive bind from something that cannot be made a slave",
@@ -128,15 +147,17 @@ func TestNew(t *testing.T) {
 			wantErr:       "unable to check mount propagation",
 		},
 		{
-			desc:     "plain bind leaves propagation alone",
-			slaveErr: errors.New("oh no"),
-			shared:   true,
-			checkErr: errors.New("oh no"),
+			desc:          "plain bind leaves propagation alone",
+			slaveErr:      errors.New("oh no"),
+			shared:        true,
+			checkErr:      errors.New("oh no"),
+			private:       true,
+			slaveCheckErr: errors.New("oh no"),
 		},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
-			origSlave, origShared := makeRSlave, isSharedMount
-			t.Cleanup(func() { makeRSlave, isSharedMount = origSlave, origShared })
+			origMake, origShared, origSlave := makeRSlave, isSharedMount, isSlaveMount
+			t.Cleanup(func() { makeRSlave, isSharedMount, isSlaveMount = origMake, origShared, origSlave })
 
 			var calls []string
 			makeRSlave = func(dir string) error {
@@ -148,6 +169,11 @@ func TestNew(t *testing.T) {
 				require.Equal(t, workloadAPISocketDir, dir)
 				calls = append(calls, "isSharedMount")
 				return tt.shared, tt.checkErr
+			}
+			isSlaveMount = func(dir string) (bool, error) {
+				require.Equal(t, workloadAPISocketDir, dir)
+				calls = append(calls, "isSlaveMount")
+				return !tt.private, tt.slaveCheckErr
 			}
 
 			_, err := New(Config{

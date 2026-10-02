@@ -38,3 +38,7 @@ func hasChildMounts(string) (bool, error) {
 func isSharedMount(string) (bool, error) {
 	return false, errors.New("unsupported on this platform")
 }
+
+func isSlaveMount(string) (bool, error) {
+	return false, errors.New("unsupported on this platform")
+}

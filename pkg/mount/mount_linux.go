@@ -82,17 +82,33 @@ func hasChildMounts(mountPoint string) (bool, error) {
 }
 
 func isSharedMount(path string) (bool, error) {
+	m, err := containingMount(path)
+	if err != nil {
+		return false, err
+	}
+	return m.isShared(), nil
+}
+
+func isSlaveMount(path string) (bool, error) {
+	m, err := containingMount(path)
+	if err != nil {
+		return false, err
+	}
+	return m.isSlave(), nil
+}
+
+func containingMount(path string) (mountInfo, error) {
 	// mountinfo records canonical paths, and mounting follows symlinks.
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return false, fmt.Errorf("unable to resolve %q: %w", path, err)
+		return mountInfo{}, fmt.Errorf("unable to resolve %q: %w", path, err)
 	}
 	f, err := os.Open(procMountInfo)
 	if err != nil {
-		return false, fmt.Errorf("unable to open mount info: %w", err)
+		return mountInfo{}, fmt.Errorf("unable to open mount info: %w", err)
 	}
 	defer func() { _ = f.Close() }()
-	return isSharedMountInReader(f, resolved)
+	return containingMountInReader(f, resolved)
 }
 
 // mountInfo is a parsed mountinfo record.
@@ -103,8 +119,18 @@ type mountInfo struct {
 
 // isShared reports whether the record's optional fields mark it shared.
 func (m mountInfo) isShared() bool {
+	return m.hasOptionalField("shared:")
+}
+
+// isSlave reports whether the record's optional fields mark it a slave, that
+// is, receiving mounts and unmounts from a master peer group.
+func (m mountInfo) isSlave() bool {
+	return m.hasOptionalField("master:")
+}
+
+func (m mountInfo) hasOptionalField(prefix string) bool {
 	for i := optionalFieldIdx; i < len(m.fields) && m.fields[i] != "-"; i++ {
-		if strings.HasPrefix(m.fields[i], "shared:") {
+		if strings.HasPrefix(m.fields[i], prefix) {
 			return true
 		}
 	}
@@ -138,25 +164,45 @@ func hasChildMountsInReader(r io.Reader, mountPoint string) (bool, error) {
 }
 
 // isSharedMountInReader reports whether the mount that path lives on, as
-// recorded in r, is shared. The mount that path lives on is the one with the
-// longest mount point containing it; of several at the same mount point, the
-// last listed is on top.
+// recorded in r, is shared.
 func isSharedMountInReader(r io.Reader, path string) (bool, error) {
+	m, err := containingMountInReader(r, path)
+	if err != nil {
+		return false, err
+	}
+	return m.isShared(), nil
+}
+
+// isSlaveMountInReader reports whether the mount that path lives on, as
+// recorded in r, is a slave.
+func isSlaveMountInReader(r io.Reader, path string) (bool, error) {
+	m, err := containingMountInReader(r, path)
+	if err != nil {
+		return false, err
+	}
+	return m.isSlave(), nil
+}
+
+// containingMountInReader returns the record of the mount that path lives on:
+// the one with the longest mount point containing it, and of several at the
+// same mount point, the last listed, which is on top.
+func containingMountInReader(r io.Reader, path string) (mountInfo, error) {
 	path = filepath.Clean(path)
-	bestLen, shared := -1, false
+	var best mountInfo
+	bestLen := -1
 	err := scanMountInfo(r, func(m mountInfo) bool {
 		if containsPath(m.mountPoint, path) && len(m.mountPoint) >= bestLen {
-			bestLen, shared = len(m.mountPoint), m.isShared()
+			best, bestLen = m, len(m.mountPoint)
 		}
 		return false
 	})
 	if err != nil {
-		return false, err
+		return mountInfo{}, err
 	}
 	if bestLen < 0 {
-		return false, fmt.Errorf("no mount contains %q", path)
+		return mountInfo{}, fmt.Errorf("no mount contains %q", path)
 	}
-	return shared, nil
+	return best, nil
 }
 
 func containsPath(mountPoint, path string) bool {

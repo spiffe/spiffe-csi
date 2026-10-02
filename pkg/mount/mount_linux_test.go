@@ -128,6 +128,65 @@ func TestIsSharedMountInReader_Propagation(t *testing.T) {
 	}
 }
 
+func TestIsSlaveMountInReader(t *testing.T) {
+	for _, tt := range []struct {
+		desc  string
+		lines []string
+		want  bool
+	}{
+		{
+			desc:  "slave",
+			lines: []string{"1 0 0:1 / /sock rw master:7 - tmpfs t rw"},
+			want:  true,
+		},
+		{
+			desc:  "shared and slave",
+			lines: []string{"1 0 0:1 / /sock rw shared:8 master:7 - tmpfs t rw"},
+			want:  true,
+		},
+		{
+			desc:  "shared only",
+			lines: []string{"1 0 0:1 / /sock rw shared:7 - tmpfs t rw"},
+			want:  false,
+		},
+		{
+			desc:  "private",
+			lines: []string{"1 0 0:1 / /sock rw - tmpfs t rw"},
+			want:  false,
+		},
+		{
+			desc:  "master field after the separator is not propagation",
+			lines: []string{"1 0 0:1 / /sock rw - tmpfs master:7 rw"},
+			want:  false,
+		},
+		{
+			desc: "the mount on top decides",
+			lines: []string{
+				"1 0 0:1 / /sock rw master:7 - tmpfs t rw",
+				"2 1 0:2 / /sock rw - tmpfs t rw",
+			},
+			want: false,
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := isSlaveMountInReader(strings.NewReader(strings.Join(tt.lines, "\n")+"\n"), "/sock")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestIsSlaveMountInReaderFixture(t *testing.T) {
+	f, err := os.Open(procMountInfo)
+	require.NoError(t, err)
+	defer f.Close()
+
+	// shared:195 master:28 in the fixture.
+	got, err := isSlaveMountInReader(f, "/var/lib/kubelet/pods")
+	require.NoError(t, err)
+	assert.True(t, got)
+}
+
 func TestIsSharedMountInReader_NoContainingMount(t *testing.T) {
 	_, err := isSharedMountInReader(strings.NewReader("1 0 0:1 / /other rw - tmpfs t rw\n"), "/sock")
 	require.ErrorContains(t, err, "no mount contains")
