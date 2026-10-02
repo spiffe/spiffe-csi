@@ -15,6 +15,10 @@ func bindMountRecursiveRW(string, string) error {
 	return errors.New("unsupported on this platform")
 }
 
+func makeRSlave(string) error {
+	return errors.New("unsupported on this platform")
+}
+
 func unmount(string) error {
 	return errors.New("unsupported on this platform")
 }
@@ -28,5 +32,9 @@ func isMountPoint(string) (bool, error) {
 }
 
 func hasChildMounts(string) (bool, error) {
+	return false, errors.New("unsupported on this platform")
+}
+
+func isSharedMount(string) (bool, error) {
 	return false, errors.New("unsupported on this platform")
 }

@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
@@ -45,6 +46,12 @@ func init() {
 	hasChildMounts = func(string) (bool, error) {
 		return false, nil
 	}
+	isSharedMount = func(string) (bool, error) {
+		return false, nil
+	}
+	makeRSlave = func(string) error {
+		return nil
+	}
 	isMountPoint = func(path string) (bool, error) {
 		if testDescription == unmountFailureTest {
 			return true, nil
@@ -84,6 +91,78 @@ func TestNew(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+
+	for _, tt := range []struct {
+		desc          string
+		recursiveBind bool
+		slaveErr      error
+		shared        bool
+		checkErr      error
+		wantCalls     []string
+		wantErr       string
+	}{
+		{
+			desc:          "recursive bind makes the source a slave, then checks it",
+			recursiveBind: true,
+			wantCalls:     []string{"makeRSlave", "isSharedMount"},
+		},
+		{
+			desc:          "recursive bind from something that cannot be made a slave",
+			recursiveBind: true,
+			slaveErr:      errors.New("invalid argument"),
+			wantCalls:     []string{"makeRSlave"},
+			wantErr:       "it must be a mount point of its own",
+		},
+		{
+			desc:          "recursive bind from a mount still shared afterwards",
+			recursiveBind: true,
+			shared:        true,
+			wantCalls:     []string{"makeRSlave", "isSharedMount"},
+			wantErr:       "still is after making it a slave",
+		},
+		{
+			desc:          "recursive bind with propagation unknown",
+			recursiveBind: true,
+			checkErr:      errors.New("oh no"),
+			wantCalls:     []string{"makeRSlave", "isSharedMount"},
+			wantErr:       "unable to check mount propagation",
+		},
+		{
+			desc:     "plain bind leaves propagation alone",
+			slaveErr: errors.New("oh no"),
+			shared:   true,
+			checkErr: errors.New("oh no"),
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			origSlave, origShared := makeRSlave, isSharedMount
+			t.Cleanup(func() { makeRSlave, isSharedMount = origSlave, origShared })
+
+			var calls []string
+			makeRSlave = func(dir string) error {
+				require.Equal(t, workloadAPISocketDir, dir)
+				calls = append(calls, "makeRSlave")
+				return tt.slaveErr
+			}
+			isSharedMount = func(dir string) (bool, error) {
+				require.Equal(t, workloadAPISocketDir, dir)
+				calls = append(calls, "isSharedMount")
+				return tt.shared, tt.checkErr
+			}
+
+			_, err := New(Config{
+				NodeID:               testNodeID,
+				WorkloadAPISocketDir: workloadAPISocketDir,
+				RecursiveBind:        tt.recursiveBind,
+			})
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantErr)
+			}
+			require.Equal(t, tt.wantCalls, calls)
+		})
+	}
 }
 
 func TestBoilerplateRPCs(t *testing.T) {

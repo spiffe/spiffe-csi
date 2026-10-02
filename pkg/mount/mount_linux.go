@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,8 +14,9 @@ import (
 )
 
 const (
-	msBind uintptr = 4096  // LINUX MS_BIND
-	msRec  uintptr = 16384 // LINUX MS_REC
+	msBind  uintptr = 4096   // LINUX MS_BIND
+	msRec   uintptr = 16384  // LINUX MS_REC
+	msSlave uintptr = 524288 // LINUX MS_SLAVE
 )
 
 var (
@@ -24,9 +26,13 @@ var (
 	procMountInfo = "/proc/self/mountinfo"
 )
 
-// mountPointIdx is the slice index of the mount point in a parsed mountinfo
-// record. proc(5) "/proc/[pid]/mountinfo" documents it as field 5.
-const mountPointIdx = 4
+// Slice indices into a parsed mountinfo record. proc(5) "/proc/[pid]/mountinfo"
+// documents the mount point as field 5, followed after field 6 by optional
+// fields (such as "shared:N" and "master:N") up to a lone "-".
+const (
+	mountPointIdx    = 4
+	optionalFieldIdx = 6
+)
 
 func bindMountRW(root, mountPoint string) error {
 	return unix.Mount(root, mountPoint, "none", msBind, "")
@@ -38,6 +44,13 @@ func bindMountRW(root, mountPoint string) error {
 // mounted afterwards never appears.
 func bindMountRecursiveRW(root, mountPoint string) error {
 	return unix.Mount(root, mountPoint, "none", msBind|msRec, "")
+}
+
+// makeRSlave makes mountPoint, and everything beneath it, a slave of the peer
+// group it belonged to: it keeps receiving mounts and unmounts from there, and
+// stops sending its own back. It changes only the calling mount namespace.
+func makeRSlave(mountPoint string) error {
+	return unix.Mount("", mountPoint, "", msSlave|msRec, "")
 }
 
 func unmount(mountPoint string) error {
@@ -68,12 +81,47 @@ func hasChildMounts(mountPoint string) (bool, error) {
 	return hasChildMountsInReader(f, mountPoint)
 }
 
+func isSharedMount(path string) (bool, error) {
+	// mountinfo records canonical paths, and mounting follows symlinks.
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return false, fmt.Errorf("unable to resolve %q: %w", path, err)
+	}
+	f, err := os.Open(procMountInfo)
+	if err != nil {
+		return false, fmt.Errorf("unable to open mount info: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+	return isSharedMountInReader(f, resolved)
+}
+
+// mountInfo is a parsed mountinfo record.
+type mountInfo struct {
+	mountPoint string
+	fields     []string
+}
+
+// isShared reports whether the record's optional fields mark it shared.
+func (m mountInfo) isShared() bool {
+	for i := optionalFieldIdx; i < len(m.fields) && m.fields[i] != "-"; i++ {
+		if strings.HasPrefix(m.fields[i], "shared:") {
+			return true
+		}
+	}
+	return false
+}
+
 // isMountPointInReader scans mountinfo-formatted records from r and reports
 // whether any record's mount point (field 5) equals mountPoint. It returns on
 // the first match so the per-call working set is independent of the host's
 // total mount count.
 func isMountPointInReader(r io.Reader, mountPoint string) (bool, error) {
-	return anyMountPointInReader(r, func(mp string) bool { return mp == mountPoint })
+	found := false
+	err := scanMountInfo(r, func(m mountInfo) bool {
+		found = m.mountPoint == mountPoint
+		return found
+	})
+	return found, err
 }
 
 // hasChildMountsInReader reports whether any record in r is mounted beneath
@@ -81,12 +129,43 @@ func isMountPointInReader(r io.Reader, mountPoint string) (bool, error) {
 // unmount of it fail with EBUSY.
 func hasChildMountsInReader(r io.Reader, mountPoint string) (bool, error) {
 	prefix := strings.TrimSuffix(mountPoint, "/") + "/"
-	return anyMountPointInReader(r, func(mp string) bool { return strings.HasPrefix(mp, prefix) })
+	found := false
+	err := scanMountInfo(r, func(m mountInfo) bool {
+		found = strings.HasPrefix(m.mountPoint, prefix)
+		return found
+	})
+	return found, err
 }
 
-// anyMountPointInReader scans mountinfo-formatted records from r and reports
-// whether match returns true for any record's unescaped mount point.
-func anyMountPointInReader(r io.Reader, match func(string) bool) (bool, error) {
+// isSharedMountInReader reports whether the mount that path lives on, as
+// recorded in r, is shared. The mount that path lives on is the one with the
+// longest mount point containing it; of several at the same mount point, the
+// last listed is on top.
+func isSharedMountInReader(r io.Reader, path string) (bool, error) {
+	path = filepath.Clean(path)
+	bestLen, shared := -1, false
+	err := scanMountInfo(r, func(m mountInfo) bool {
+		if containsPath(m.mountPoint, path) && len(m.mountPoint) >= bestLen {
+			bestLen, shared = len(m.mountPoint), m.isShared()
+		}
+		return false
+	})
+	if err != nil {
+		return false, err
+	}
+	if bestLen < 0 {
+		return false, fmt.Errorf("no mount contains %q", path)
+	}
+	return shared, nil
+}
+
+func containsPath(mountPoint, path string) bool {
+	return path == mountPoint || mountPoint == "/" || strings.HasPrefix(path, mountPoint+"/")
+}
+
+// scanMountInfo calls fn with each mountinfo-formatted record in r, with the
+// mount point unescaped, until fn returns true.
+func scanMountInfo(r io.Reader, fn func(mountInfo) bool) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -94,14 +173,14 @@ func anyMountPointInReader(r io.Reader, match func(string) bool) (bool, error) {
 		if len(fields) <= mountPointIdx {
 			continue
 		}
-		if match(unescapeOctal(fields[mountPointIdx])) {
-			return true, nil
+		if fn(mountInfo{mountPoint: unescapeOctal(fields[mountPointIdx]), fields: fields}) {
+			return nil
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return false, fmt.Errorf("failed to scan mount info: %w", err)
+		return fmt.Errorf("failed to scan mount info: %w", err)
 	}
-	return false, nil
+	return nil
 }
 
 var reOctal = regexp.MustCompile(`\\([0-7]{3})`)

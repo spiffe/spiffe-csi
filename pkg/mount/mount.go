@@ -15,6 +15,13 @@ func BindMountRecursiveRW(root, mountPoint string) error {
 	return bindMountRecursiveRW(root, mountPoint)
 }
 
+// MakeRSlave makes a mount point, and everything beneath it, a slave mount in
+// the calling mount namespace: mounts and unmounts still propagate into it, and
+// none propagate out of it.
+func MakeRSlave(mountPoint string) error {
+	return makeRSlave(mountPoint)
+}
+
 // Unmount unmounts a mount
 func Unmount(mountPoint string) error {
 	return unmount(mountPoint)
@@ -36,4 +43,10 @@ func IsMountPoint(mountPoint string) (bool, error) {
 // point.
 func HasChildMounts(mountPoint string) (bool, error) {
 	return hasChildMounts(mountPoint)
+}
+
+// IsSharedMount returns whether the mount that path lives on is shared, so that
+// mounts and unmounts beneath it propagate to its peers.
+func IsSharedMount(path string) (bool, error) {
+	return isSharedMount(path)
 }

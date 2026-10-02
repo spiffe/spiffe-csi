@@ -24,6 +24,8 @@ var (
 	unmountDetach        = mount.UnmountDetach
 	isMountPoint         = mount.IsMountPoint
 	hasChildMounts       = mount.HasChildMounts
+	isSharedMount        = mount.IsSharedMount
+	makeRSlave           = mount.MakeRSlave
 )
 
 // Config is the configuration for the driver
@@ -43,6 +45,10 @@ type Config struct {
 	// bind a workload sees the underlying directory and never the filesystem
 	// mounted on it, and a filesystem replaced while the workload is running is
 	// never picked up.
+	//
+	// New makes the driver's own view of the socket directory a slave mount,
+	// so the directory must be a mount point of its own, such as a volume.
+	// Mount it HostToContainer, so it still receives the host's mounts.
 	RecursiveBind bool
 }
 
@@ -65,6 +71,31 @@ func New(config Config) (*Driver, error) {
 		return nil, errors.New("node ID is required")
 	case config.WorkloadAPISocketDir == "":
 		return nil, errors.New("workload API socket directory is required")
+	}
+	if config.RecursiveBind {
+		// A recursive bind of a shared mount makes each copy beneath the
+		// target a peer of the original beneath the source, and of the copy
+		// beneath every other target. Detaching one target on unpublish then
+		// unmounts all of those too, which empties every other published
+		// volume and the source itself. A slave source receives the host's
+		// mounts without sending unmounts back.
+		//
+		// The pod spec cannot guarantee a slave: when any volume of a
+		// container is Bidirectional, as the kubelet pods directory is for a
+		// CSI driver, the runtime makes every mount in the container shared,
+		// HostToContainer ones included. So the driver makes its own view a
+		// slave here, in its own mount namespace only, before publishing
+		// anything.
+		if err := makeRSlave(config.WorkloadAPISocketDir); err != nil {
+			return nil, fmt.Errorf("unable to make the workload API socket directory %q a slave mount; it must be a mount point of its own: %w", config.WorkloadAPISocketDir, err)
+		}
+		shared, err := isSharedMount(config.WorkloadAPISocketDir)
+		if err != nil {
+			return nil, fmt.Errorf("unable to check mount propagation of the workload API socket directory: %w", err)
+		}
+		if shared {
+			return nil, fmt.Errorf("recursive bind requires the workload API socket directory %q not to be on a shared mount, and it still is after making it a slave", config.WorkloadAPISocketDir)
+		}
 	}
 	return &Driver{
 		log:                  config.Log,
