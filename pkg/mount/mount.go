@@ -10,7 +10,7 @@ func BindMountRW(root, mountPoint string) error {
 // including anything mounted beneath root. Mounts made under root afterwards
 // propagate to mountPoint when root is on a shared mount.
 //
-// UnmountDetach must be used to undo it; see that function.
+// The result can have child mounts, which Unmount refuses; see UnmountDetach.
 func BindMountRecursiveRW(root, mountPoint string) error {
 	return bindMountRecursiveRW(root, mountPoint)
 }
@@ -20,9 +20,9 @@ func Unmount(mountPoint string) error {
 	return unmount(mountPoint)
 }
 
-// UnmountDetach detaches a mount and anything mounted beneath it. It is the
-// counterpart of BindMountRecursiveRW: a recursive bind can leave the mount with
-// children, and unmounting a mount that has children fails with EBUSY.
+// UnmountDetach detaches a mount and anything mounted beneath it. Use it for a
+// mount that HasChildMounts reports children for, which Unmount refuses with
+// EBUSY.
 func UnmountDetach(mountPoint string) error {
 	return unmountDetach(mountPoint)
 }
@@ -30,4 +30,10 @@ func UnmountDetach(mountPoint string) error {
 // IsMountPoint returns whether or not the given mount point is valid.
 func IsMountPoint(mountPoint string) (bool, error) {
 	return isMountPoint(mountPoint)
+}
+
+// HasChildMounts returns whether anything is mounted beneath the given mount
+// point.
+func HasChildMounts(mountPoint string) (bool, error) {
+	return hasChildMounts(mountPoint)
 }

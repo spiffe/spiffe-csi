@@ -26,3 +26,7 @@ func unmountDetach(string) error {
 func isMountPoint(string) (bool, error) {
 	return false, errors.New("unsupported on this platform")
 }
+
+func hasChildMounts(string) (bool, error) {
+	return false, errors.New("unsupported on this platform")
+}

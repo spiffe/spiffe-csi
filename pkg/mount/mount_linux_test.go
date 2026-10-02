@@ -26,6 +26,32 @@ func TestIsMountPoint(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestHasChildMounts(t *testing.T) {
+	for _, tt := range []struct {
+		desc       string
+		mountPoint string
+		want       bool
+	}{
+		{desc: "mount with children", mountPoint: "/var/lib/kubelet/pods", want: true},
+		{desc: "trailing slash", mountPoint: "/var/lib/kubelet/pods/", want: true},
+		{desc: "mount without children", mountPoint: "/var/lib/kubelet/pods/c3a32fc0-f186-4974-8579-429dea58ec6d/volumes/kubernetes.io~csi/spire-agent-socket/mount", want: false},
+		{desc: "sibling sharing a name prefix", mountPoint: "/var/lib/kubelet/po", want: false},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := HasChildMounts(tt.mountPoint)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestHasChildMountsInReader_OctalEscape(t *testing.T) {
+	const line = `36 35 0:0 / /mnt/has\040space/child rw,relatime - tmpfs tmpfs rw`
+	got, err := hasChildMountsInReader(strings.NewReader(line+"\n"), "/mnt/has space")
+	require.NoError(t, err)
+	assert.True(t, got)
+}
+
 // TestIsMountPointInReader_OctalEscape verifies that mount points containing
 // whitespace match against their octal-escaped representation in mountinfo
 // (e.g. "/mnt/has space" appears as "/mnt/has\040space" in field 5).

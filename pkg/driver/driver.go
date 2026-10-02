@@ -23,6 +23,7 @@ var (
 	unmount              = mount.Unmount
 	unmountDetach        = mount.UnmountDetach
 	isMountPoint         = mount.IsMountPoint
+	hasChildMounts       = mount.HasChildMounts
 )
 
 // Config is the configuration for the driver
@@ -35,7 +36,7 @@ type Config struct {
 	// RecursiveBind publishes anything mounted beneath the Workload API socket
 	// directory along with the directory itself, and keeps tracking it as it is
 	// mounted and unmounted. Off by default, since it changes what a workload
-	// sees and how the volume is torn down.
+	// sees.
 	//
 	// It is needed when the socket directory is not a plain directory holding a
 	// socket but a mount point in its own right, or contains one: with a plain
@@ -198,9 +199,14 @@ func (d *Driver) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVo
 		return nil, status.Errorf(codes.Internal, "unable to verify mount point %q: %v", req.TargetPath, err)
 	} else if ok {
 		// A recursive bind can leave the target with child mounts, which a
-		// plain unmount refuses with EBUSY, so the two settings move together.
+		// plain unmount refuses with EBUSY. The flag can change across driver
+		// restarts while volumes stay published, so the target's own mounts
+		// decide. A child that propagates in after the check fails this
+		// attempt, and the kubelet retries.
 		unmountTarget := unmount
-		if d.recursiveBind {
+		if hasChildren, err := hasChildMounts(req.TargetPath); err != nil {
+			return nil, status.Errorf(codes.Internal, "unable to check for mounts beneath %q: %v", req.TargetPath, err)
+		} else if hasChildren {
 			unmountTarget = unmountDetach
 		}
 		if err := unmountTarget(req.TargetPath); err != nil {

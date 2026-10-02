@@ -45,8 +45,7 @@ func unmount(mountPoint string) error {
 }
 
 // unmountDetach detaches mountPoint and anything mounted beneath it. A plain
-// unmount of a mount that has children fails with EBUSY, which is why this is
-// the counterpart of bindMountRecursiveRW rather than an independent choice.
+// unmount of a mount that has children fails with EBUSY.
 func unmountDetach(mountPoint string) error {
 	return unix.Unmount(mountPoint, unix.MNT_DETACH)
 }
@@ -60,11 +59,34 @@ func isMountPoint(mountPoint string) (bool, error) {
 	return isMountPointInReader(f, mountPoint)
 }
 
+func hasChildMounts(mountPoint string) (bool, error) {
+	f, err := os.Open(procMountInfo)
+	if err != nil {
+		return false, fmt.Errorf("unable to open mount info: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+	return hasChildMountsInReader(f, mountPoint)
+}
+
 // isMountPointInReader scans mountinfo-formatted records from r and reports
 // whether any record's mount point (field 5) equals mountPoint. It returns on
 // the first match so the per-call working set is independent of the host's
 // total mount count.
 func isMountPointInReader(r io.Reader, mountPoint string) (bool, error) {
+	return anyMountPointInReader(r, func(mp string) bool { return mp == mountPoint })
+}
+
+// hasChildMountsInReader reports whether any record in r is mounted beneath
+// mountPoint, i.e. whether mountPoint has children that would make a plain
+// unmount of it fail with EBUSY.
+func hasChildMountsInReader(r io.Reader, mountPoint string) (bool, error) {
+	prefix := strings.TrimSuffix(mountPoint, "/") + "/"
+	return anyMountPointInReader(r, func(mp string) bool { return strings.HasPrefix(mp, prefix) })
+}
+
+// anyMountPointInReader scans mountinfo-formatted records from r and reports
+// whether match returns true for any record's unescaped mount point.
+func anyMountPointInReader(r io.Reader, match func(string) bool) (bool, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -72,7 +94,7 @@ func isMountPointInReader(r io.Reader, mountPoint string) (bool, error) {
 		if len(fields) <= mountPointIdx {
 			continue
 		}
-		if unescapeOctal(fields[mountPointIdx]) == mountPoint {
+		if match(unescapeOctal(fields[mountPointIdx])) {
 			return true, nil
 		}
 	}
