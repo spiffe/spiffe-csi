@@ -6,7 +6,7 @@ on:
 
 jobs:
   validate:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     permissions:
       contents: read
@@ -24,7 +24,7 @@ jobs:
         run: make test
 
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     permissions:
       contents: read
@@ -49,7 +49,7 @@ jobs:
           path: images.tar.gz
 
   k8s-versions:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     permissions:
       contents: read
@@ -65,7 +65,7 @@ jobs:
         run: echo "versions=$(jq -c '[.kubernetes[].version]' test/k8s-versions.json)" >> "$GITHUB_OUTPUT"
 
   integration-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [build, k8s-versions]
 
     permissions:
@@ -97,7 +97,7 @@ jobs:
         run: K8S_VERSION=${{ matrix.k8s-version }} test/run.sh
 
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [validate, integration-test]
 
     permissions:
