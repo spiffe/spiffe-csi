@@ -36,6 +36,8 @@ PLATFORMS ?= linux/amd64,linux/arm64
 
 build_dir := $(DIR)/.build/$(os1)-$(arch1)
 
+go_version := $(shell awk '/^go /{print $$2}' go.mod)
+
 golangci_lint_version = v2.11.4
 golangci_lint_dir = $(build_dir)/golangci_lint/$(golangci_lint_version)
 golangci_lint_bin = $(golangci_lint_dir)/golangci-lint
@@ -58,6 +60,7 @@ spiffe-csi-driver-image.tar: Dockerfile FORCE | container-builder
 	docker buildx build \
 		--platform $(PLATFORMS) \
 		--target spiffe-csi-driver \
+		--build-arg GO_VERSION=$(go_version) \
 		-o type=oci,dest=$@ \
 		--provenance=false \
 		--sbom=false \
