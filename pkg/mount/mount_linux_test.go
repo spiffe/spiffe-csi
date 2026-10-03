@@ -68,7 +68,7 @@ func TestIsSharedMountInReader(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			f, err := os.Open(procMountInfo)
 			require.NoError(t, err)
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 
 			got, err := isSharedMountInReader(f, tt.path)
 			require.NoError(t, err)
@@ -179,7 +179,7 @@ func TestIsSlaveMountInReader(t *testing.T) {
 func TestIsSlaveMountInReaderFixture(t *testing.T) {
 	f, err := os.Open(procMountInfo)
 	require.NoError(t, err)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// shared:195 master:28 in the fixture.
 	got, err := isSlaveMountInReader(f, "/var/lib/kubelet/pods")

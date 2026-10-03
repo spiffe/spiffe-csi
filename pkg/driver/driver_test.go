@@ -758,7 +758,7 @@ func TestNodeUnpublishVolumeChildMountCheckFails(t *testing.T) {
 	require.NoError(t, err)
 
 	targetPath := filepath.Join(t.TempDir(), "target")
-	require.NoError(t, os.Mkdir(targetPath, 0o755))
+	require.NoError(t, os.Mkdir(targetPath, 0o750))
 	require.NoError(t, writeMeta(targetPath, "mounted"))
 
 	_, err = d.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
