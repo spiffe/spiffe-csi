@@ -6,6 +6,7 @@ const (
 	CSISocketPath        = "csiSocketPath"
 	FullMethod           = "fullMethod"
 	NodeID               = "nodeID"
+	RecursiveBind        = "recursiveBind"
 	TargetPath           = "targetPath"
 	Version              = "version"
 	VolumeID             = "volumeID"

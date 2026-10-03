@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
@@ -41,6 +42,18 @@ func init() {
 	}
 	unmount = func(dst string) error {
 		return os.Remove(metaPath(dst))
+	}
+	hasChildMounts = func(string) (bool, error) {
+		return false, nil
+	}
+	isSharedMount = func(string) (bool, error) {
+		return false, nil
+	}
+	makeRSlave = func(string) error {
+		return nil
+	}
+	isSlaveMount = func(string) (bool, error) {
+		return true, nil
 	}
 	isMountPoint = func(path string) (bool, error) {
 		if testDescription == unmountFailureTest {
@@ -81,6 +94,101 @@ func TestNew(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+
+	for _, tt := range []struct {
+		desc          string
+		recursiveBind bool
+		slaveErr      error
+		shared        bool
+		checkErr      error
+		private       bool
+		slaveCheckErr error
+		wantCalls     []string
+		wantErr       string
+	}{
+		{
+			desc:          "recursive bind makes the source a slave, then checks it",
+			recursiveBind: true,
+			wantCalls:     []string{"makeRSlave", "isSharedMount", "isSlaveMount"},
+		},
+		{
+			desc:          "recursive bind from a source that receives no mounts",
+			recursiveBind: true,
+			private:       true,
+			wantCalls:     []string{"makeRSlave", "isSharedMount", "isSlaveMount"},
+			wantErr:       "receives none; mount it HostToContainer",
+		},
+		{
+			desc:          "recursive bind with slave state unknown",
+			recursiveBind: true,
+			slaveCheckErr: errors.New("oh no"),
+			wantCalls:     []string{"makeRSlave", "isSharedMount", "isSlaveMount"},
+			wantErr:       "unable to check mount propagation",
+		},
+		{
+			desc:          "recursive bind from something that cannot be made a slave",
+			recursiveBind: true,
+			slaveErr:      errors.New("invalid argument"),
+			wantCalls:     []string{"makeRSlave"},
+			wantErr:       "it must be a mount point of its own",
+		},
+		{
+			desc:          "recursive bind from a mount still shared afterwards",
+			recursiveBind: true,
+			shared:        true,
+			wantCalls:     []string{"makeRSlave", "isSharedMount"},
+			wantErr:       "still is after making it a slave",
+		},
+		{
+			desc:          "recursive bind with propagation unknown",
+			recursiveBind: true,
+			checkErr:      errors.New("oh no"),
+			wantCalls:     []string{"makeRSlave", "isSharedMount"},
+			wantErr:       "unable to check mount propagation",
+		},
+		{
+			desc:          "plain bind leaves propagation alone",
+			slaveErr:      errors.New("oh no"),
+			shared:        true,
+			checkErr:      errors.New("oh no"),
+			private:       true,
+			slaveCheckErr: errors.New("oh no"),
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			origMake, origShared, origSlave := makeRSlave, isSharedMount, isSlaveMount
+			t.Cleanup(func() { makeRSlave, isSharedMount, isSlaveMount = origMake, origShared, origSlave })
+
+			var calls []string
+			makeRSlave = func(dir string) error {
+				require.Equal(t, workloadAPISocketDir, dir)
+				calls = append(calls, "makeRSlave")
+				return tt.slaveErr
+			}
+			isSharedMount = func(dir string) (bool, error) {
+				require.Equal(t, workloadAPISocketDir, dir)
+				calls = append(calls, "isSharedMount")
+				return tt.shared, tt.checkErr
+			}
+			isSlaveMount = func(dir string) (bool, error) {
+				require.Equal(t, workloadAPISocketDir, dir)
+				calls = append(calls, "isSlaveMount")
+				return !tt.private, tt.slaveCheckErr
+			}
+
+			_, err := New(Config{
+				NodeID:               testNodeID,
+				WorkloadAPISocketDir: workloadAPISocketDir,
+				RecursiveBind:        tt.recursiveBind,
+			})
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantErr)
+			}
+			require.Equal(t, tt.wantCalls, calls)
+		})
+	}
 }
 
 func TestBoilerplateRPCs(t *testing.T) {
@@ -568,4 +676,95 @@ func assertProtoEqual[M proto.Message](t *testing.T, a, b M) {
 	if diff := cmp.Diff(a, b, protocmp.Transform()); diff != "" {
 		require.FailNowf(t, "Proto are not equal", "diff:\n%s\n", diff)
 	}
+}
+
+// The flag picks the bind and the target's child mounts pick the unmount, since
+// the flag can change across driver restarts while volumes stay published.
+func TestRecursiveBindAndChildMountsSelectMountAndUnmount(t *testing.T) {
+	for _, tt := range []struct {
+		desc          string
+		recursiveBind bool
+		hasChildren   bool
+		wantBind      string
+		wantUnmount   string
+	}{
+		{desc: "off by default", recursiveBind: false, hasChildren: false, wantBind: "plain", wantUnmount: "plain"},
+		{desc: "on without children", recursiveBind: true, hasChildren: false, wantBind: "recursive", wantUnmount: "plain"},
+		{desc: "on with children", recursiveBind: true, hasChildren: true, wantBind: "recursive", wantUnmount: "detach"},
+		{desc: "turned off with children", recursiveBind: false, hasChildren: true, wantBind: "plain", wantUnmount: "detach"},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			var gotBind, gotUnmount string
+
+			restore := func(b, br func(string, string) error, u, ud func(string) error, hc func(string) (bool, error)) func() {
+				return func() {
+					bindMountRW, bindMountRecursiveRW, unmount, unmountDetach, hasChildMounts = b, br, u, ud, hc
+				}
+			}(bindMountRW, bindMountRecursiveRW, unmount, unmountDetach, hasChildMounts)
+			t.Cleanup(restore)
+
+			bindMountRW = func(src, dst string) error { gotBind = "plain"; return writeMeta(dst, src) }
+			bindMountRecursiveRW = func(src, dst string) error { gotBind = "recursive"; return writeMeta(dst, src) }
+			unmount = func(dst string) error { gotUnmount = "plain"; return os.Remove(metaPath(dst)) }
+			unmountDetach = func(dst string) error { gotUnmount = "detach"; return os.Remove(metaPath(dst)) }
+			hasChildMounts = func(string) (bool, error) { return tt.hasChildren, nil }
+
+			d, err := New(Config{
+				Log:                  logr.Discard(),
+				NodeID:               testNodeID,
+				PluginName:           "csi.spiffe.io",
+				WorkloadAPISocketDir: t.TempDir(),
+				RecursiveBind:        tt.recursiveBind,
+			})
+			require.NoError(t, err)
+
+			targetPath := filepath.Join(t.TempDir(), "target")
+			_, err = d.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
+				VolumeId:   "volumeID",
+				TargetPath: targetPath,
+				// Called directly rather than over gRPC, so the nested
+				// messages must be non-nil to pass validation.
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}},
+					AccessMode: &csi.VolumeCapability_AccessMode{},
+				},
+				Readonly:      true,
+				VolumeContext: map[string]string{"csi.storage.k8s.io/ephemeral": "true"},
+			})
+			require.NoError(t, err)
+			require.Equal(t, tt.wantBind, gotBind, "wrong bind mount")
+
+			_, err = d.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
+				VolumeId:   "volumeID",
+				TargetPath: targetPath,
+			})
+			require.NoError(t, err)
+			require.Equal(t, tt.wantUnmount, gotUnmount, "wrong unmount")
+		})
+	}
+}
+
+func TestNodeUnpublishVolumeChildMountCheckFails(t *testing.T) {
+	orig := hasChildMounts
+	t.Cleanup(func() { hasChildMounts = orig })
+	hasChildMounts = func(string) (bool, error) { return false, fmt.Errorf("oh no") }
+
+	d, err := New(Config{
+		Log:                  logr.Discard(),
+		NodeID:               testNodeID,
+		PluginName:           "csi.spiffe.io",
+		WorkloadAPISocketDir: t.TempDir(),
+	})
+	require.NoError(t, err)
+
+	targetPath := filepath.Join(t.TempDir(), "target")
+	require.NoError(t, os.Mkdir(targetPath, 0o750))
+	require.NoError(t, writeMeta(targetPath, "mounted"))
+
+	_, err = d.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
+		VolumeId:   "volumeID",
+		TargetPath: targetPath,
+	})
+	require.Equal(t, codes.Internal, status.Code(err))
+	require.ErrorContains(t, err, "unable to check for mounts beneath")
 }

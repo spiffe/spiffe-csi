@@ -18,9 +18,15 @@ import (
 
 var (
 	// We replace these in tests since bind mounting generally requires root.
-	bindMountRW  = mount.BindMountRW
-	unmount      = mount.Unmount
-	isMountPoint = mount.IsMountPoint
+	bindMountRW          = mount.BindMountRW
+	bindMountRecursiveRW = mount.BindMountRecursiveRW
+	unmount              = mount.Unmount
+	unmountDetach        = mount.UnmountDetach
+	isMountPoint         = mount.IsMountPoint
+	hasChildMounts       = mount.HasChildMounts
+	isSharedMount        = mount.IsSharedMount
+	makeRSlave           = mount.MakeRSlave
+	isSlaveMount         = mount.IsSlaveMount
 )
 
 // Config is the configuration for the driver
@@ -29,6 +35,27 @@ type Config struct {
 	NodeID               string
 	PluginName           string
 	WorkloadAPISocketDir string
+
+	// RecursiveBind publishes anything mounted beneath the Workload API socket
+	// directory along with the directory itself, and keeps tracking it as it is
+	// mounted and unmounted. Off by default, since it changes what a workload
+	// sees.
+	//
+	// It is needed when the socket directory is not a plain directory holding a
+	// socket but a mount point in its own right, or contains one: with a plain
+	// bind a workload sees the underlying directory and never the filesystem
+	// mounted on it, and a filesystem replaced while the workload is running is
+	// never picked up.
+	//
+	// New makes the driver's own view of the socket directory a slave mount,
+	// so the directory must be a mount point of its own, such as a volume.
+	// It must be mounted HostToContainer, so it still receives the host's
+	// mounts; New refuses one that receives none.
+	//
+	// Read-only volumes only cover their top: anything mounted beneath the
+	// socket directory reaches every workload with its own writability. See
+	// "Recursive Bind" in the README.
+	RecursiveBind bool
 }
 
 // Driver is the ephemeral-inline CSI driver implementation
@@ -40,6 +67,7 @@ type Driver struct {
 	nodeID               string
 	pluginName           string
 	workloadAPISocketDir string
+	recursiveBind        bool
 }
 
 // New creates a new driver with the given config
@@ -50,11 +78,47 @@ func New(config Config) (*Driver, error) {
 	case config.WorkloadAPISocketDir == "":
 		return nil, errors.New("workload API socket directory is required")
 	}
+	if config.RecursiveBind {
+		// A recursive bind of a shared mount makes each copy beneath the
+		// target a peer of the original beneath the source, and of the copy
+		// beneath every other target. Detaching one target on unpublish then
+		// unmounts all of those too, which empties every other published
+		// volume and the source itself. A slave source receives the host's
+		// mounts without sending unmounts back.
+		//
+		// The pod spec cannot guarantee a slave: when any volume of a
+		// container is Bidirectional, as the kubelet pods directory is for a
+		// CSI driver, the runtime makes every mount in the container shared,
+		// HostToContainer ones included. So the driver makes its own view a
+		// slave here, in its own mount namespace only, before publishing
+		// anything.
+		if err := makeRSlave(config.WorkloadAPISocketDir); err != nil {
+			return nil, fmt.Errorf("unable to make the workload API socket directory %q a slave mount; it must be a mount point of its own: %w", config.WorkloadAPISocketDir, err)
+		}
+		shared, err := isSharedMount(config.WorkloadAPISocketDir)
+		if err != nil {
+			return nil, fmt.Errorf("unable to check mount propagation of the workload API socket directory: %w", err)
+		}
+		if shared {
+			return nil, fmt.Errorf("recursive bind requires the workload API socket directory %q not to be on a shared mount, and it still is after making it a slave", config.WorkloadAPISocketDir)
+		}
+		// Still a slave means the directory receives the host's mounts. A
+		// private one, as a volume without HostToContainer is, never does, so
+		// the driver would only ever publish what was mounted when it started.
+		slave, err := isSlaveMount(config.WorkloadAPISocketDir)
+		if err != nil {
+			return nil, fmt.Errorf("unable to check mount propagation of the workload API socket directory: %w", err)
+		}
+		if !slave {
+			return nil, fmt.Errorf("recursive bind requires the workload API socket directory %q to receive mounts from the host, and it receives none; mount it HostToContainer", config.WorkloadAPISocketDir)
+		}
+	}
 	return &Driver{
 		log:                  config.Log,
 		nodeID:               config.NodeID,
 		pluginName:           config.PluginName,
 		workloadAPISocketDir: config.WorkloadAPISocketDir,
+		recursiveBind:        config.RecursiveBind,
 	}, nil
 }
 
@@ -143,7 +207,11 @@ func (d *Driver) NodePublishVolume(_ context.Context, req *csi.NodePublishVolume
 	// be writable by workload containers. We enforce that the CSI volume is
 	// marked read-only above, instructing the kubelet to mount it read-only
 	// into containers, while we mount the volume read-write to the host.
-	if err := bindMountRW(d.workloadAPISocketDir, req.TargetPath); err != nil {
+	bindMount := bindMountRW
+	if d.recursiveBind {
+		bindMount = bindMountRecursiveRW
+	}
+	if err := bindMount(d.workloadAPISocketDir, req.TargetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "unable to mount %q: %v", req.TargetPath, err)
 	}
 
@@ -177,7 +245,18 @@ func (d *Driver) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVo
 	if ok, err := isMountPoint(req.TargetPath); err != nil {
 		return nil, status.Errorf(codes.Internal, "unable to verify mount point %q: %v", req.TargetPath, err)
 	} else if ok {
-		if err := unmount(req.TargetPath); err != nil {
+		// A recursive bind can leave the target with child mounts, which a
+		// plain unmount refuses with EBUSY. The flag can change across driver
+		// restarts while volumes stay published, so the target's own mounts
+		// decide. A child that propagates in after the check fails this
+		// attempt, and the kubelet retries.
+		unmountTarget := unmount
+		if hasChildren, err := hasChildMounts(req.TargetPath); err != nil {
+			return nil, status.Errorf(codes.Internal, "unable to check for mounts beneath %q: %v", req.TargetPath, err)
+		} else if hasChildren {
+			unmountTarget = unmountDetach
+		}
+		if err := unmountTarget(req.TargetPath); err != nil {
 			return nil, status.Errorf(codes.Internal, "unable to unmount %q: %v", req.TargetPath, err)
 		}
 	}
