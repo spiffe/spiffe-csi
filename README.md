@@ -54,7 +54,14 @@ in environments where `hostPath` volumes are forbidden.
 
 ## Example
 
-An example deployment can be found [here](./example). 
+An example deployment can be found [here](./example).
+
+## Configuration
+
+### Logging
+
+By default, the driver emits human-readable log lines. Use `-log-format=json` for
+JSON structured output suitable for log aggregation systems.
 
 ## Troubleshooting
 
