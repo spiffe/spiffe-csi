@@ -222,6 +222,10 @@ func (d *Driver) NodeGetInfo(context.Context, *csi.NodeGetInfoRequest) (*csi.Nod
 
 // NodeGetVolumeHealth reports whether the Workload API socket directory is
 // reachable through the published volume.
+//
+// As of Kubernetes 1.37, the kubelet skips ephemeral inline CSI volumes when
+// collecting volume health, so it does not call this RPC for the volumes this
+// driver serves.
 func (d *Driver) NodeGetVolumeHealth(_ context.Context, req *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error) {
 	log := d.log.WithValues(
 		logkeys.VolumeID, req.VolumeId,
