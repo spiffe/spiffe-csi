@@ -5,31 +5,18 @@ set -e -o pipefail
 DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 
-# Versions under test
-K8S_VERSION=${K8S_VERSION:-v1.32.2}
-
-# Determine which Kind node to use for the K8s version under test. The node
-# hashes are tightly coupled to the Kind version used and they must be updated
-# together.
-KIND_VERSION=v0.27.0
-case "$K8S_VERSION" in
-    v1.32.2)
-        KIND_NODE="sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f"
-        ;;
-    v1.31.6)
-        KIND_NODE="sha256:28b7cbb993dfe093c76641a0c95807637213c9109b761f1d422c2400e22b8e87"
-        ;;
-    v1.30.10)
-        KIND_NODE="sha256:4de75d0e82481ea846c0ed1de86328d821c1e6a6a91ac37bf804e5313670e507"
-        ;;
-    v1.29.14)
-        KIND_NODE="sha256:8703bd94ee24e51b778d5556ae310c6c0fa67d761fae6379c8e0bb480e6fea29"
-        ;;
-    *)
-        echo "no kind node available for Kind $KIND_VERSION and Kubernetes $K8S_VERSION" 1>&2
-        exit 1
-        ;;
-esac
+# Versions under test are listed in k8s-versions.json, which is also used to
+# build the CI matrix. The node images are tightly coupled to the Kind version
+# and they must be updated together, using the images listed in the release
+# notes for that Kind version. K8S_VERSION defaults to the first entry.
+VERSIONS_FILE="${DIR}/k8s-versions.json"
+KIND_VERSION=$(jq -r '.kind' "${VERSIONS_FILE}")
+K8S_VERSION=${K8S_VERSION:-$(jq -r '.kubernetes[0].version' "${VERSIONS_FILE}")}
+KIND_NODE_IMAGE=$(jq -r --arg v "$K8S_VERSION" '.kubernetes[] | select(.version == $v) | .nodeImage' "${VERSIONS_FILE}")
+if [ -z "$KIND_NODE_IMAGE" ]; then
+    echo "no kind node available for Kind $KIND_VERSION and Kubernetes $K8S_VERSION in ${VERSIONS_FILE}" 1>&2
+    exit 1
+fi
 
 # Export the Kind cluster name so we don't have to specify it on every kind
 # invocation
@@ -123,7 +110,7 @@ download-kind() {
 
 create-cluster() {
     echo "Creating cluster..."
-    "${KIND}" create cluster --image=kindest/node@$KIND_NODE --config "${DIR}/config/cluster.yaml"
+    "${KIND}" create cluster --image="$KIND_NODE_IMAGE" --config "${DIR}/config/cluster.yaml"
     echo "Cluster created."
     "${KUBECTL}" version
 }
