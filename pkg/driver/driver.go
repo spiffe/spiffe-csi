@@ -4,7 +4,6 @@ package driver
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -15,11 +14,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-// workloadAPIMountUnhealthyReason is the reason reported in a volume health
-// entry when the Workload API socket directory cannot be reached through the
-// volume.
-const workloadAPIMountUnhealthyReason = "WorkloadAPIMountUnhealthy"
 
 var (
 	// We replace these in tests since bind mounting generally requires root.
@@ -199,17 +193,8 @@ func (d *Driver) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVo
 
 // NodeGetCapabilities returns the capabilities of the node service.
 func (d *Driver) NodeGetCapabilities(context.Context, *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	return &csi.NodeGetCapabilitiesResponse{
-		Capabilities: []*csi.NodeServiceCapability{
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_GET_VOLUME_HEALTH,
-					},
-				},
-			},
-		},
-	}, nil
+	// GET_VOLUME_HEALTH is not advertised. See NodeGetVolumeHealth.
+	return &csi.NodeGetCapabilitiesResponse{}, nil
 }
 
 // NodeGetInfo returns info about the node.
@@ -220,53 +205,11 @@ func (d *Driver) NodeGetInfo(context.Context, *csi.NodeGetInfoRequest) (*csi.Nod
 	}, nil
 }
 
-// NodeGetVolumeHealth reports whether the Workload API socket directory is
-// reachable through the published volume.
-//
-// As of Kubernetes 1.37, the kubelet skips ephemeral inline CSI volumes when
-// collecting volume health, so it does not call this RPC for the volumes this
-// driver serves.
-func (d *Driver) NodeGetVolumeHealth(_ context.Context, req *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error) {
-	log := d.log.WithValues(
-		logkeys.VolumeID, req.VolumeId,
-		logkeys.VolumePath, req.VolumePublishPath,
-	)
-
-	switch {
-	case req.VolumeId == "":
-		return nil, status.Error(codes.InvalidArgument, "request missing required volume id")
-	case req.VolumePublishPath == "":
-		return nil, status.Error(codes.InvalidArgument, "request missing required volume publish path")
-	}
-
-	health := &csi.VolumeHealth{VolumeId: req.VolumeId}
-	if err := d.checkWorkloadAPIMount(req.VolumePublishPath); err != nil {
-		log.Error(err, "Volume is unhealthy")
-		health.HealthStatuses = []*csi.VolumeHealth_VolumeHealthEntry{{
-			Status:  csi.VolumeHealthErrorType_INACCESSIBLE,
-			Reason:  workloadAPIMountUnhealthyReason,
-			Message: err.Error(),
-		}}
-	} else {
-		log.Info("Volume is healthy")
-	}
-
-	return &csi.NodeGetVolumeHealthResponse{VolumeHealth: health}, nil
-}
-
-func (d *Driver) checkWorkloadAPIMount(volumePath string) error {
-	// Check whether or not it is a mount point.
-	if ok, err := isMountPoint(volumePath); err != nil {
-		return fmt.Errorf("failed to determine root for volume path mount: %w", err)
-	} else if !ok {
-		return errors.New("volume path is not mounted")
-	}
-	// If a mount point, try to list files... this should fail if the mount is
-	// broken for whatever reason.
-	if _, err := os.ReadDir(volumePath); err != nil {
-		return fmt.Errorf("unable to list contents of volume path: %w", err)
-	}
-	return nil
+// NodeGetVolumeHealth is not implemented because, as of Kubernetes 1.37, the
+// kubelet skips ephemeral inline CSI volumes when collecting volume health,
+// so it never calls this RPC for the volumes this driver serves.
+func (d *Driver) NodeGetVolumeHealth(context.Context, *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "volume health is not supported for ephemeral inline volumes")
 }
 
 func isVolumeCapabilityPlainMount(volumeCapability *csi.VolumeCapability) bool {
