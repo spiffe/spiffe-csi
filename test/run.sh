@@ -43,7 +43,7 @@ esac
 ARCH=$(uname -m)
 case "${ARCH}" in
     x86_64) ARCH=amd64 ;;
-    arm64|aarch64) ARCH2=arm64 ;;
+    arm64|aarch64) ARCH=arm64 ;;
     *)
         echo "unsupported ARCH: ${ARCH}" 1>&2
         exit 1
