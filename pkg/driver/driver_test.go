@@ -115,14 +115,7 @@ func TestBoilerplateRPCs(t *testing.T) {
 				{
 					Type: &csi.NodeServiceCapability_Rpc{
 						Rpc: &csi.NodeServiceCapability_RPC{
-							Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-						},
-					},
-				},
-				{
-					Type: &csi.NodeServiceCapability_Rpc{
-						Rpc: &csi.NodeServiceCapability_RPC{
-							Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+							Type: csi.NodeServiceCapability_RPC_GET_VOLUME_HEALTH,
 						},
 					},
 				},
@@ -448,6 +441,109 @@ func TestNodeUnpublishVolume(t *testing.T) {
 			} else {
 				assert.Nil(t, resp)
 			}
+		})
+	}
+}
+
+func TestNodeGetVolumeHealth(t *testing.T) {
+	client, workloadAPISocketDir := startDriver(t)
+
+	for _, tt := range []struct {
+		desc             string
+		mutateReq        func(req *csi.NodeGetVolumeHealthRequest)
+		mungePublishPath func(t *testing.T, publishPath string)
+		expectCode       codes.Code
+		expectMsgPrefix  string
+		// expectUnhealthyMsg returns the message of the expected unhealthy
+		// entry, or is nil when the volume is expected to be healthy.
+		expectUnhealthyMsg func(publishPath string) string
+	}{
+		{
+			desc: "missing volume id",
+			mutateReq: func(req *csi.NodeGetVolumeHealthRequest) {
+				req.VolumeId = ""
+			},
+			expectCode:      codes.InvalidArgument,
+			expectMsgPrefix: "request missing required volume id",
+		},
+		{
+			desc: "missing volume publish path",
+			mutateReq: func(req *csi.NodeGetVolumeHealthRequest) {
+				req.VolumePublishPath = ""
+			},
+			expectCode:      codes.InvalidArgument,
+			expectMsgPrefix: "request missing required volume publish path",
+		},
+		{
+			desc:       isMountFailureTest,
+			expectCode: codes.OK,
+			expectUnhealthyMsg: func(string) string {
+				return "failed to determine root for volume path mount: mock invalid mount point"
+			},
+		},
+		{
+			desc: "not mounted",
+			mungePublishPath: func(t *testing.T, publishPath string) {
+				require.NoError(t, os.Remove(metaPath(publishPath)))
+			},
+			expectCode: codes.OK,
+			expectUnhealthyMsg: func(string) string {
+				return "volume path is not mounted"
+			},
+		},
+		{
+			// The unmount failure mock reports every path as a mount point,
+			// so removing the directory leaves a mount point that cannot be
+			// listed.
+			desc: unmountFailureTest,
+			mungePublishPath: func(t *testing.T, publishPath string) {
+				require.NoError(t, os.RemoveAll(publishPath))
+			},
+			expectCode: codes.OK,
+			expectUnhealthyMsg: func(publishPath string) string {
+				return fmt.Sprintf("unable to list contents of volume path: open %s: no such file or directory", publishPath)
+			},
+		},
+		{
+			desc:       "healthy",
+			expectCode: codes.OK,
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			publishPath := filepath.Join(t.TempDir(), "publish-path")
+
+			// Write out the meta file to simulate a successful mount
+			require.NoError(t, os.Mkdir(publishPath, 0750))
+			require.NoError(t, writeMeta(publishPath, workloadAPISocketDir))
+
+			if tt.mungePublishPath != nil {
+				tt.mungePublishPath(t, publishPath)
+			}
+
+			req := &csi.NodeGetVolumeHealthRequest{
+				VolumeId:          "volumeID",
+				VolumePublishPath: publishPath,
+			}
+			if tt.mutateReq != nil {
+				tt.mutateReq(req)
+			}
+			registerTestDescription(tt.desc)
+			resp, err := client.NodeGetVolumeHealth(context.Background(), req)
+			requireGRPCStatusPrefix(t, err, tt.expectCode, tt.expectMsgPrefix)
+			if err != nil {
+				assert.Nil(t, resp)
+				return
+			}
+
+			expectHealth := &csi.VolumeHealth{VolumeId: "volumeID"}
+			if tt.expectUnhealthyMsg != nil {
+				expectHealth.HealthStatuses = []*csi.VolumeHealth_VolumeHealthEntry{{
+					Status:  csi.VolumeHealthErrorType_INACCESSIBLE,
+					Reason:  "WorkloadAPIMountUnhealthy",
+					Message: tt.expectUnhealthyMsg(publishPath),
+				}}
+			}
+			assertProtoEqual(t, &csi.NodeGetVolumeHealthResponse{VolumeHealth: expectHealth}, resp)
 		})
 	}
 }

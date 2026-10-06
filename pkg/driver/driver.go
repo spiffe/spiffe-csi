@@ -16,6 +16,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// workloadAPIMountUnhealthyReason is the reason reported in a volume health
+// entry when the Workload API socket directory cannot be reached through the
+// volume.
+const workloadAPIMountUnhealthyReason = "WorkloadAPIMountUnhealthy"
+
 var (
 	// We replace these in tests since bind mounting generally requires root.
 	bindMountRW  = mount.BindMountRW
@@ -199,14 +204,7 @@ func (d *Driver) NodeGetCapabilities(context.Context, *csi.NodeGetCapabilitiesRe
 			{
 				Type: &csi.NodeServiceCapability_Rpc{
 					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-					},
-				},
-			},
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+						Type: csi.NodeServiceCapability_RPC_GET_VOLUME_HEALTH,
 					},
 				},
 			},
@@ -222,29 +220,34 @@ func (d *Driver) NodeGetInfo(context.Context, *csi.NodeGetInfoRequest) (*csi.Nod
 	}, nil
 }
 
-// NodeGetVolumeStats returns the health condition of a volume.
-func (d *Driver) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+// NodeGetVolumeHealth reports whether the Workload API socket directory is
+// reachable through the published volume.
+func (d *Driver) NodeGetVolumeHealth(_ context.Context, req *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error) {
 	log := d.log.WithValues(
 		logkeys.VolumeID, req.VolumeId,
-		logkeys.VolumePath, req.VolumePath,
+		logkeys.VolumePath, req.VolumePublishPath,
 	)
 
-	volumeConditionAbnormal := false
-	volumeConditionMessage := "mounted"
-	if err := d.checkWorkloadAPIMount(req.VolumePath); err != nil {
-		volumeConditionAbnormal = true
-		volumeConditionMessage = err.Error()
+	switch {
+	case req.VolumeId == "":
+		return nil, status.Error(codes.InvalidArgument, "request missing required volume id")
+	case req.VolumePublishPath == "":
+		return nil, status.Error(codes.InvalidArgument, "request missing required volume publish path")
+	}
+
+	health := &csi.VolumeHealth{VolumeId: req.VolumeId}
+	if err := d.checkWorkloadAPIMount(req.VolumePublishPath); err != nil {
 		log.Error(err, "Volume is unhealthy")
+		health.HealthStatuses = []*csi.VolumeHealth_VolumeHealthEntry{{
+			Status:  csi.VolumeHealthErrorType_INACCESSIBLE,
+			Reason:  workloadAPIMountUnhealthyReason,
+			Message: err.Error(),
+		}}
 	} else {
 		log.Info("Volume is healthy")
 	}
 
-	return &csi.NodeGetVolumeStatsResponse{
-		VolumeCondition: &csi.VolumeCondition{
-			Abnormal: volumeConditionAbnormal,
-			Message:  volumeConditionMessage,
-		},
-	}, nil
+	return &csi.NodeGetVolumeHealthResponse{VolumeHealth: health}, nil
 }
 
 func (d *Driver) checkWorkloadAPIMount(volumePath string) error {
