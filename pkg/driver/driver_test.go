@@ -36,6 +36,7 @@ var (
 )
 
 func init() {
+	fileLabel = func(string) (string, error) { return "", nil }
 	bindMountRW = func(src, dst string) error {
 		return writeMeta(dst, src)
 	}
@@ -79,6 +80,58 @@ func TestNew(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+
+	t.Run("SELinux sets container file type on socket dir", func(t *testing.T) {
+		var gotPath, gotLabel string
+		var gotRecursive bool
+		setSELinux(t, nil, func(path, label string, recursive bool) error {
+			gotPath, gotLabel, gotRecursive = path, label, recursive
+			return nil
+		})
+		_, err := New(Config{
+			Log:                  logr.Discard(),
+			NodeID:               testNodeID,
+			WorkloadAPISocketDir: workloadAPISocketDir,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, workloadAPISocketDir, gotPath)
+		assert.Equal(t, "system_u:object_r:container_file_t:s0", gotLabel)
+		assert.True(t, gotRecursive)
+	})
+
+	t.Run("SELinux label failure does not fail startup", func(t *testing.T) {
+		setSELinux(t, nil, func(string, string, bool) error { return fs.ErrPermission })
+		_, err := New(Config{
+			Log:                  logr.Discard(),
+			NodeID:               testNodeID,
+			WorkloadAPISocketDir: workloadAPISocketDir,
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("SELinux unreadable label skips relabel", func(t *testing.T) {
+		called := false
+		setSELinux(t, fs.ErrNotExist, func(string, string, bool) error {
+			called = true
+			return nil
+		})
+		_, err := New(Config{
+			Log:                  logr.Discard(),
+			NodeID:               testNodeID,
+			WorkloadAPISocketDir: workloadAPISocketDir,
+		})
+		require.NoError(t, err)
+		assert.False(t, called)
+	})
+}
+
+func setSELinux(t *testing.T, fileLabelErr error, chconFn func(string, string, bool) error) {
+	oldFileLabel, oldChcon := fileLabel, chcon
+	t.Cleanup(func() { fileLabel, chcon = oldFileLabel, oldChcon })
+	fileLabel = func(string) (string, error) {
+		return "system_u:object_r:container_var_run_t:s0", fileLabelErr
+	}
+	chcon = chconFn
 }
 
 func TestBoilerplateRPCs(t *testing.T) {

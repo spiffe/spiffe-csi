@@ -9,6 +9,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spiffe/spiffe-csi/internal/version"
 	"github.com/spiffe/spiffe-csi/pkg/logkeys"
 	"github.com/spiffe/spiffe-csi/pkg/mount"
@@ -21,6 +22,9 @@ var (
 	bindMountRW  = mount.BindMountRW
 	unmount      = mount.Unmount
 	isMountPoint = mount.IsMountPoint
+
+	fileLabel = selinux.FileLabel
+	chcon     = selinux.Chcon
 )
 
 // Config is the configuration for the driver
@@ -50,12 +54,30 @@ func New(config Config) (*Driver, error) {
 	case config.WorkloadAPISocketDir == "":
 		return nil, errors.New("workload API socket directory is required")
 	}
+	// A directory without an SELinux label means SELinux is off; selinux.GetEnabled is false on a read-only selinuxfs.
+	if label, err := fileLabel(config.WorkloadAPISocketDir); err == nil && label != "" {
+		if err := labelSocketDir(config.WorkloadAPISocketDir, label); err != nil {
+			config.Log.Error(err, "Failed to set the SELinux container file type on the Workload API socket directory")
+		} else {
+			config.Log.Info("Set the SELinux container file type on the Workload API socket directory")
+		}
+	}
 	return &Driver{
 		log:                  config.Log,
 		nodeID:               config.NodeID,
 		pluginName:           config.PluginName,
 		workloadAPISocketDir: config.WorkloadAPISocketDir,
 	}, nil
+}
+
+// labelSocketDir lets containers reach the socket by changing only the SELinux type, like `chcon -R -t`.
+func labelSocketDir(dir, label string) error {
+	ctx, err := selinux.NewContext(label)
+	if err != nil {
+		return err
+	}
+	ctx["type"] = "container_file_t"
+	return chcon(dir, ctx.Get(), true)
 }
 
 /////////////////////////////////////////////////////////////////////////////
