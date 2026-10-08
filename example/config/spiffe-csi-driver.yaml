@@ -44,10 +44,10 @@ spec:
                   fieldPath: spec.nodeName
           volumeMounts:
             # The volume containing the SPIRE agent socket. The SPIFFE CSI
-            # driver will mount this directory into containers.
+            # driver will mount this directory into containers. It is writable
+            # so the driver can set the SELinux label on it.
             - mountPath: /spire-agent-socket
               name: spire-agent-socket-dir
-              readOnly: true
             # The volume that will contain the CSI driver socket shared
             # with the kubelet and the driver registrar.
             - mountPath: /spiffe-csi
