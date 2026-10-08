@@ -4,7 +4,6 @@ package driver
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -194,24 +193,8 @@ func (d *Driver) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpublishVo
 
 // NodeGetCapabilities returns the capabilities of the node service.
 func (d *Driver) NodeGetCapabilities(context.Context, *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	return &csi.NodeGetCapabilitiesResponse{
-		Capabilities: []*csi.NodeServiceCapability{
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-					},
-				},
-			},
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-					},
-				},
-			},
-		},
-	}, nil
+	// GET_VOLUME_HEALTH is not advertised. See NodeGetVolumeHealth.
+	return &csi.NodeGetCapabilitiesResponse{}, nil
 }
 
 // NodeGetInfo returns info about the node.
@@ -222,44 +205,11 @@ func (d *Driver) NodeGetInfo(context.Context, *csi.NodeGetInfoRequest) (*csi.Nod
 	}, nil
 }
 
-// NodeGetVolumeStats returns the health condition of a volume.
-func (d *Driver) NodeGetVolumeStats(_ context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	log := d.log.WithValues(
-		logkeys.VolumeID, req.VolumeId,
-		logkeys.VolumePath, req.VolumePath,
-	)
-
-	volumeConditionAbnormal := false
-	volumeConditionMessage := "mounted"
-	if err := d.checkWorkloadAPIMount(req.VolumePath); err != nil {
-		volumeConditionAbnormal = true
-		volumeConditionMessage = err.Error()
-		log.Error(err, "Volume is unhealthy")
-	} else {
-		log.Info("Volume is healthy")
-	}
-
-	return &csi.NodeGetVolumeStatsResponse{
-		VolumeCondition: &csi.VolumeCondition{
-			Abnormal: volumeConditionAbnormal,
-			Message:  volumeConditionMessage,
-		},
-	}, nil
-}
-
-func (d *Driver) checkWorkloadAPIMount(volumePath string) error {
-	// Check whether or not it is a mount point.
-	if ok, err := isMountPoint(volumePath); err != nil {
-		return fmt.Errorf("failed to determine root for volume path mount: %w", err)
-	} else if !ok {
-		return errors.New("volume path is not mounted")
-	}
-	// If a mount point, try to list files... this should fail if the mount is
-	// broken for whatever reason.
-	if _, err := os.ReadDir(volumePath); err != nil {
-		return fmt.Errorf("unable to list contents of volume path: %w", err)
-	}
-	return nil
+// NodeGetVolumeHealth is not implemented because, as of Kubernetes 1.37, the
+// kubelet skips ephemeral inline CSI volumes when collecting volume health,
+// so it never calls this RPC for the volumes this driver serves.
+func (d *Driver) NodeGetVolumeHealth(context.Context, *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "volume health is not supported for ephemeral inline volumes")
 }
 
 func isVolumeCapabilityPlainMount(volumeCapability *csi.VolumeCapability) bool {

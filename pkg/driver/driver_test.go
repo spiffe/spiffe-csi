@@ -110,24 +110,7 @@ func TestBoilerplateRPCs(t *testing.T) {
 	t.Run("NodeGetCapabilities", func(t *testing.T) {
 		resp, err := client.NodeGetCapabilities(context.Background(), &csi.NodeGetCapabilitiesRequest{})
 		require.NoError(t, err)
-		requireProtoEqual(t, &csi.NodeGetCapabilitiesResponse{
-			Capabilities: []*csi.NodeServiceCapability{
-				{
-					Type: &csi.NodeServiceCapability_Rpc{
-						Rpc: &csi.NodeServiceCapability_RPC{
-							Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-						},
-					},
-				},
-				{
-					Type: &csi.NodeServiceCapability_Rpc{
-						Rpc: &csi.NodeServiceCapability_RPC{
-							Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-						},
-					},
-				},
-			},
-		}, resp, "unexpected response")
+		requireProtoEqual(t, &csi.NodeGetCapabilitiesResponse{}, resp, "unexpected response")
 	})
 
 	t.Run("NodeGetInfo", func(t *testing.T) {
@@ -137,6 +120,12 @@ func TestBoilerplateRPCs(t *testing.T) {
 			NodeId:            testNodeID,
 			MaxVolumesPerNode: 0,
 		}, resp, "unexpected response")
+	})
+
+	t.Run("NodeGetVolumeHealth", func(t *testing.T) {
+		resp, err := client.NodeGetVolumeHealth(context.Background(), &csi.NodeGetVolumeHealthRequest{})
+		requireGRPCStatusPrefix(t, err, codes.Unimplemented, "volume health is not supported for ephemeral inline volumes")
+		assert.Nil(t, resp)
 	})
 }
 
