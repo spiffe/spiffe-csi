@@ -191,6 +191,102 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestNewSELinux(t *testing.T) {
+	workloadAPISocketDir := t.TempDir()
+
+	t.Run("SELinux sets container file type on each entry", func(t *testing.T) {
+		dir := t.TempDir()
+		socket := filepath.Join(dir, "socket")
+		require.NoError(t, os.WriteFile(socket, nil, 0o600))
+		other := filepath.Join(dir, "other")
+		require.NoError(t, os.Mkdir(other, 0o700))
+		got := map[string]string{}
+		setSELinux(t, map[string]string{
+			dir:    "unconfined_u:object_r:container_var_run_t:s0:c1,c2",
+			socket: "system_u:object_r:container_var_run_t:s0:c3,c4",
+			other:  "system_u:object_r:nfs_t:s0",
+		}, func(path, label string) error {
+			got[path] = label
+			return nil
+		})
+		_, err := New(Config{
+			Log:                  logr.Discard(),
+			NodeID:               testNodeID,
+			WorkloadAPISocketDir: dir,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{
+			dir:    "unconfined_u:object_r:container_file_t:s0:c1,c2",
+			socket: "system_u:object_r:container_file_t:s0:c3,c4",
+		}, got)
+	})
+
+	t.Run("SELinux keeps an operator-chosen type", func(t *testing.T) {
+		called := false
+		setSELinux(t, map[string]string{
+			workloadAPISocketDir: "system_u:object_r:spire_agent_socket_t:s0",
+		}, func(string, string) error {
+			called = true
+			return nil
+		})
+		_, err := New(Config{
+			Log:                  logr.Discard(),
+			NodeID:               testNodeID,
+			WorkloadAPISocketDir: workloadAPISocketDir,
+		})
+		require.NoError(t, err)
+		assert.False(t, called)
+	})
+
+	t.Run("SELinux entry failure keeps the directory type and startup", func(t *testing.T) {
+		dir := t.TempDir()
+		socket := filepath.Join(dir, "socket")
+		require.NoError(t, os.WriteFile(socket, nil, 0o600))
+		var got []string
+		setSELinux(t, map[string]string{
+			dir:    "system_u:object_r:container_var_run_t:s0",
+			socket: "system_u:object_r:container_var_run_t:s0",
+		}, func(path, _ string) error {
+			got = append(got, path)
+			return fs.ErrPermission
+		})
+		_, err := New(Config{
+			Log:                  logr.Discard(),
+			NodeID:               testNodeID,
+			WorkloadAPISocketDir: dir,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{socket}, got)
+	})
+
+	t.Run("SELinux unreadable label skips relabel", func(t *testing.T) {
+		called := false
+		setSELinux(t, nil, func(string, string) error {
+			called = true
+			return nil
+		})
+		_, err := New(Config{
+			Log:                  logr.Discard(),
+			NodeID:               testNodeID,
+			WorkloadAPISocketDir: workloadAPISocketDir,
+		})
+		require.NoError(t, err)
+		assert.False(t, called)
+	})
+}
+
+func setSELinux(t *testing.T, labels map[string]string, setFn func(string, string) error) {
+	oldFileLabel, oldSetFileLabel := fileLabel, setFileLabel
+	t.Cleanup(func() { fileLabel, setFileLabel = oldFileLabel, oldSetFileLabel })
+	fileLabel = func(path string) (string, error) {
+		if label, ok := labels[path]; ok {
+			return label, nil
+		}
+		return "", fs.ErrNotExist
+	}
+	setFileLabel = setFn
+}
+
 func TestBoilerplateRPCs(t *testing.T) {
 	client, _ := startDriver(t)
 
