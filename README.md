@@ -106,6 +106,16 @@ An example deployment can be found [here](./example).
 By default, the driver emits human-readable log lines. Use `-log-format=json` for
 JSON structured output suitable for log aggregation systems.
 
+### SELinux
+
+On SELinux nodes, the driver changes the type of the Workload API socket directory
+and its entries from `container_var_run_t` to `container_file_t` at startup, so
+workload containers can connect to the socket. Each entry keeps its user, role and
+level. This needs a writable mount of the socket directory in the driver container.
+
+The driver leaves any other type unchanged. To use your own type, label the
+directory yourself; the driver then skips it.
+
 ## Troubleshooting
 
 This component has a fairly simple design and function but some of the

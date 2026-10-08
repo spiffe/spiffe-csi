@@ -5,10 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-logr/logr"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/spiffe/spiffe-csi/internal/version"
 	"github.com/spiffe/spiffe-csi/pkg/logkeys"
 	"github.com/spiffe/spiffe-csi/pkg/mount"
@@ -27,6 +31,9 @@ var (
 	isSharedMount        = mount.IsSharedMount
 	makeRSlave           = mount.MakeRSlave
 	isSlaveMount         = mount.IsSlaveMount
+
+	fileLabel    = selinux.LfileLabel
+	setFileLabel = selinux.LsetFileLabel
 )
 
 // Config is the configuration for the driver
@@ -113,6 +120,14 @@ func New(config Config) (*Driver, error) {
 			return nil, fmt.Errorf("recursive bind requires the workload API socket directory %q to receive mounts from the host, and it receives none; mount it HostToContainer", config.WorkloadAPISocketDir)
 		}
 	}
+	// Only the runtime default type changes, so an operator-chosen type stays; this works on a read-only selinuxfs.
+	if label, err := fileLabel(config.WorkloadAPISocketDir); err == nil && strings.Contains(label, ":container_var_run_t:") {
+		if err := labelSocketDir(config.WorkloadAPISocketDir); err != nil {
+			config.Log.Error(err, "Failed to set the SELinux container file type on the Workload API socket directory")
+		} else {
+			config.Log.Info("Set the SELinux container file type on the Workload API socket directory")
+		}
+	}
 	return &Driver{
 		log:                  config.Log,
 		nodeID:               config.NodeID,
@@ -120,6 +135,25 @@ func New(config Config) (*Driver, error) {
 		workloadAPISocketDir: config.WorkloadAPISocketDir,
 		recursiveBind:        config.RecursiveBind,
 	}, nil
+}
+
+// labelSocketDir swaps container_var_run_t for container_file_t on each entry and keeps the rest, like `chcon -R -t`.
+func labelSocketDir(dir string) error {
+	return filepath.WalkDir(dir, func(path string, _ fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		label, err := fileLabel(path)
+		if err != nil {
+			return err
+		}
+		parts := strings.SplitN(label, ":", 4)
+		if len(parts) != 4 || parts[2] != "container_var_run_t" {
+			return nil
+		}
+		parts[2] = "container_file_t"
+		return setFileLabel(path, strings.Join(parts, ":"))
+	})
 }
 
 /////////////////////////////////////////////////////////////////////////////
