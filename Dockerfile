@@ -1,5 +1,9 @@
+# check=skip=InvalidDefaultArgInFrom
+# Set from the go directive in go.mod by the Makefile.
+ARG GO_VERSION
+
 # Build the SPIFFE CSI Driver binary
-FROM --platform=${BUILDPLATFORM} golang:1.26.5-alpine AS base
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS base
 WORKDIR /code
 RUN apk --no-cache --update add make
 COPY go.* ./

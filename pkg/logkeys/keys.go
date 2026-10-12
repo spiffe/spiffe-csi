@@ -10,6 +10,5 @@ const (
 	TargetPath           = "targetPath"
 	Version              = "version"
 	VolumeID             = "volumeID"
-	VolumePath           = "volumePath"
 	WorkloadAPISocketDir = "workloadAPISocketDir"
 )

@@ -218,24 +218,7 @@ func TestBoilerplateRPCs(t *testing.T) {
 	t.Run("NodeGetCapabilities", func(t *testing.T) {
 		resp, err := client.NodeGetCapabilities(context.Background(), &csi.NodeGetCapabilitiesRequest{})
 		require.NoError(t, err)
-		requireProtoEqual(t, &csi.NodeGetCapabilitiesResponse{
-			Capabilities: []*csi.NodeServiceCapability{
-				{
-					Type: &csi.NodeServiceCapability_Rpc{
-						Rpc: &csi.NodeServiceCapability_RPC{
-							Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-						},
-					},
-				},
-				{
-					Type: &csi.NodeServiceCapability_Rpc{
-						Rpc: &csi.NodeServiceCapability_RPC{
-							Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-						},
-					},
-				},
-			},
-		}, resp, "unexpected response")
+		requireProtoEqual(t, &csi.NodeGetCapabilitiesResponse{}, resp, "unexpected response")
 	})
 
 	t.Run("NodeGetInfo", func(t *testing.T) {
@@ -245,6 +228,12 @@ func TestBoilerplateRPCs(t *testing.T) {
 			NodeId:            testNodeID,
 			MaxVolumesPerNode: 0,
 		}, resp, "unexpected response")
+	})
+
+	t.Run("NodeGetVolumeHealth", func(t *testing.T) {
+		resp, err := client.NodeGetVolumeHealth(context.Background(), &csi.NodeGetVolumeHealthRequest{})
+		requireGRPCStatusPrefix(t, err, codes.Unimplemented, "volume health is not supported for ephemeral inline volumes")
+		assert.Nil(t, resp)
 	})
 }
 
@@ -564,14 +553,14 @@ func registerTestDescription(desc string) {
 	testDescription = desc
 }
 
-func requireGRPCStatusPrefix(tb testing.TB, err error, code codes.Code, msgPrefix string, msgAndArgs ...interface{}) {
+func requireGRPCStatusPrefix(tb testing.TB, err error, code codes.Code, msgPrefix string, msgAndArgs ...any) {
 	st := status.Convert(err)
 	if code != st.Code() || !strings.HasPrefix(st.Message(), msgPrefix) {
 		require.Fail(tb, fmt.Sprintf("Status code=%q msg=%q does not match code=%q with msg prefix %q", st.Code(), st.Message(), code, msgPrefix), msgAndArgs...)
 	}
 }
 
-func requireProtoEqual(tb testing.TB, expected, actual interface{}, msgAndArgs ...interface{}) {
+func requireProtoEqual(tb testing.TB, expected, actual any, msgAndArgs ...any) {
 	// The CSI spec codegen uses the old proto package, which doesn't have
 	// good comparison support, so just render the structs as json and
 	// compare.

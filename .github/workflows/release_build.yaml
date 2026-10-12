@@ -6,16 +6,16 @@ on:
 
 jobs:
   validate:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     permissions:
       contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: 'go.mod'
       - name: Lint
@@ -24,20 +24,20 @@ jobs:
         run: make test
 
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     permissions:
       contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@39bf30ced4be9d147faaabbde2682e9725fb8bd1 # main
+        uses: regclient/actions/regctl-installer@b7d935a4b4f550aa3b5ad20941f7d2f9285565b2 # main
       - name: Build image
         run: make docker-build
       - name: Export images
@@ -48,9 +48,25 @@ jobs:
           name: images
           path: images.tar.gz
 
+  k8s-versions:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+
+    outputs:
+      versions: ${{ steps.versions.outputs.versions }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Read Kubernetes versions
+        id: versions
+        run: echo "versions=$(jq -c '[.kubernetes[].version]' test/k8s-versions.json)" >> "$GITHUB_OUTPUT"
+
   integration-test:
-    runs-on: ubuntu-latest
-    needs: [build]
+    runs-on: ubuntu-24.04
+    needs: [build, k8s-versions]
 
     permissions:
       contents: read
@@ -58,20 +74,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Choose tags corresponding to the version of Kind being used.
-        # At a minimum, we should test the currently supported versions of
-        # Kubernetes, but can go back farther as long as we don't need heroics
-        # to pull it off (i.e. kubectl version juggling).
-        k8s-version:
-          - v1.32.2
-          - v1.31.6
-          - v1.30.10
-          - v1.29.14
+        # The Kubernetes versions under test are listed in
+        # test/k8s-versions.json. At a minimum, we should test the currently
+        # supported versions of Kubernetes, but can go back farther as long as
+        # we don't need heroics to pull it off (i.e. kubectl version juggling).
+        k8s-version: ${{ fromJSON(needs.k8s-versions.outputs.versions) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@39bf30ced4be9d147faaabbde2682e9725fb8bd1 # main
+        uses: regclient/actions/regctl-installer@b7d935a4b4f550aa3b5ad20941f7d2f9285565b2 # main
       - name: Download archived images
         uses: actions/download-artifact@v8
         with:
@@ -85,7 +97,7 @@ jobs:
         run: K8S_VERSION=${{ matrix.k8s-version }} test/run.sh
 
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [validate, integration-test]
 
     permissions:
@@ -95,20 +107,20 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: v2.6.3
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@39bf30ced4be9d147faaabbde2682e9725fb8bd1 # main
+        uses: regclient/actions/regctl-installer@b7d935a4b4f550aa3b5ad20941f7d2f9285565b2 # main
       - name: Download archived images
         uses: actions/download-artifact@v8
         with:
           name: images
           path: .
       - name: Log in to GHCR
-        uses: docker/login-action@v4
+        uses: docker/login-action@v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
