@@ -4,6 +4,7 @@ package driver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
