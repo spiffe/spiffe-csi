@@ -7,6 +7,7 @@ require (
 	github.com/go-logr/logr v1.4.4
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.7.0
+	github.com/opencontainers/selinux v1.15.1
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/zap v1.28.0
 	golang.org/x/sys v0.49.0
@@ -15,6 +16,7 @@ require (
 )
 
 require (
+	github.com/cyphar/filepath-securejoin v0.5.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/net v0.57.0 // indirect
