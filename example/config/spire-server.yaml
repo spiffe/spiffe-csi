@@ -177,7 +177,7 @@ spec:
       shareProcessNamespace: true
       containers:
         - name: spire-server
-          image: ghcr.io/spiffe/spire-server:1.8.0
+          image: ghcr.io/spiffe/spire-server:1.15.5
           imagePullPolicy: IfNotPresent
           args: ["-config", "/run/spire/config/server.conf"]
           ports:
