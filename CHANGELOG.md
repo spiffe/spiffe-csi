@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0] - 2026-10-23
+
+### Security
+
+- Updated Go to 1.27.3 to address CVE-2026-111943 and related standard library advisories (#385, #396)
+- Updated google.golang.org/grpc to v1.84.0 to address CVE-2026-84304, CVE-2026-84445 and related advisories (#364, #383)
+
+### Added
+
+- `-log-format` flag, which accepts `text` (the default) or `json` for structured logging (#376)
+
+### Changed
+
+- Updated the CSI spec to v1.13.0 and stopped advertising the `GET_VOLUME_STATS` and `VOLUME_CONDITION` node capabilities. The kubelet no longer polls `NodeGetVolumeStats` for each volume, and clusters with the alpha `CSIVolumeHealth` feature gate enabled no longer receive volume health from the driver (#390)
+- Dependency updates
+
 ## [0.2.13] - 2026-07-09
 
 ### Security
