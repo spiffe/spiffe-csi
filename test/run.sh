@@ -78,6 +78,16 @@ cleanup() {
         echo "================================================="
         "${KUBECTL}" logs deployment/test-workload-2 --all-containers=true || true
 
+        echo "================================================="
+        echo "LOGS: SPIFFE CSI Driver (recursive bind)"
+        echo "================================================="
+        "${KUBECTL}" logs -nspire-system daemonset/spiffe-csi-driver-recursive --all-containers=true || true
+
+        echo "================================================="
+        echo "MOUNTS: recursive bind, as the node sees them"
+        echo "================================================="
+        on-node grep -E "spiffe-csi-test|recursive" /proc/self/mountinfo || true
+
     fi
 
     [ -n "$SKIPCLEANUP" ] || delete-cluster
@@ -194,6 +204,95 @@ check-workload-status() {
     return 1
 }
 
+# The source directory the recursive driver publishes, on the node.
+RECURSIVE_SOURCE=/run/spiffe-csi-test/recursive
+
+# Runs a command on the node, in its own mount namespace. Kind nodes are
+# containers on the machine running the test.
+on-node() {
+    docker exec "$("${KIND}" get nodes | head -n1)" "$@"
+}
+
+deploy-recursive() {
+    "${KUBECTL}" apply -k "${DIR}"/config/recursive
+    echo "Waiting for SPIFFE CSI Driver (recursive bind) rollout..."
+    "${KUBECTL}" rollout status -w --timeout=1m -nspire-system daemonset/spiffe-csi-driver-recursive
+    echo "Waiting for recursive workload 1 rollout..."
+    "${KUBECTL}" rollout status -w --timeout=1m deployment/recursive-workload-1
+    echo "Waiting for recursive workload 2 rollout..."
+    "${KUBECTL}" rollout status -w --timeout=1m deployment/recursive-workload-2
+}
+
+# Waits for a workload to read the marker from the filesystem mounted beneath
+# its volume. Propagation is synchronous, so this only waits out kubectl.
+check-workload-sees-mount() {
+    local _which="$1"
+    local _numchecks=30
+    local _interval=1
+    local _got
+    echo -n "Checking $_which sees the mount beneath its volume."
+    for ((i=1;i<=_numchecks;i++)); do
+        echo -n "."
+        _got=$("${KUBECTL}" exec "deployment/$_which" -- /bin/cat /recursive/sub/marker 2>/dev/null | tr -d '[:space:]' || true)
+        if [ "${_got}" == "propagated" ]; then
+            echo "ok."
+            return 0
+        fi
+        sleep "${_interval}"
+    done
+    echo "oh no!"
+    echo "$_which does not see the mount beneath its volume: marker=${_got}" 1>&2
+    return 1
+}
+
+check-node-has-mount() {
+    if ! on-node grep -q " ${RECURSIVE_SOURCE}/sub " /proc/self/mountinfo; then
+        echo "The node no longer has the mount at ${RECURSIVE_SOURCE}/sub" 1>&2
+        return 1
+    fi
+    if [ "$(on-node cat "${RECURSIVE_SOURCE}/sub/marker" | tr -d '[:space:]')" != "propagated" ]; then
+        echo "The node's mount at ${RECURSIVE_SOURCE}/sub no longer has the marker" 1>&2
+        return 1
+    fi
+    echo "The node still has the mount."
+}
+
+# A filesystem mounted beneath the socket directory after two workloads have
+# started has to reach both, and tearing one workload down has to leave it for
+# the other, for the node, and for the driver's own view, which the replacement
+# workload is published from. A recursive bind whose copies stay peers of the
+# source fails here: detaching one workload's volume unmounts the filesystem
+# for everyone.
+check-recursive-bind() {
+    echo "Checking the recursive bind..."
+
+    # Nothing is mounted yet. If a workload already sees the marker, the
+    # ordering under test is not happening.
+    for _which in recursive-workload-1 recursive-workload-2; do
+        if "${KUBECTL}" exec "deployment/$_which" -- /bin/sh -c 'test -e /recursive/sub/marker'; then
+            echo "$_which sees the marker before anything was mounted" 1>&2
+            return 1
+        fi
+    done
+
+    on-node mkdir -p "${RECURSIVE_SOURCE}/sub"
+    on-node mount -t tmpfs recursive-test "${RECURSIVE_SOURCE}/sub"
+    on-node /bin/sh -c "echo propagated > ${RECURSIVE_SOURCE}/sub/marker"
+
+    check-workload-sees-mount recursive-workload-1
+    check-workload-sees-mount recursive-workload-2
+
+    echo "Deleting the recursive workload 1 pod..."
+    "${KUBECTL}" delete pod -l app=recursive-workload-1 --wait --timeout=1m
+
+    check-workload-sees-mount recursive-workload-2
+    check-node-has-mount
+
+    echo "Waiting for the replacement recursive workload 1..."
+    "${KUBECTL}" rollout status -w --timeout=1m deployment/recursive-workload-1
+    check-workload-sees-mount recursive-workload-1
+}
+
 echo "Starting integration test..."
 
 build-workload
@@ -206,5 +305,7 @@ register-workloads
 deploy-workloads
 check-workload-status "test-workload-1"
 check-workload-status "test-workload-2"
+deploy-recursive
+check-recursive-bind
 SUCCESS=1
 echo "Done."

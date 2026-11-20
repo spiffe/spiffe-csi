@@ -1,0 +1,98 @@
+# A second instance of the driver, with -recursive-bind, publishing a directory
+# that the test mounts a filesystem beneath while workloads are running. It runs
+# alongside the default instance so that both modes are covered.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spiffe-csi-driver-recursive
+  namespace: spire-system
+  labels:
+    app: spiffe-csi-driver-recursive
+spec:
+  selector:
+    matchLabels:
+      app: spiffe-csi-driver-recursive
+  template:
+    metadata:
+      namespace: spire-system
+      labels:
+        app: spiffe-csi-driver-recursive
+    spec:
+      serviceAccountName: spiffe-csi-driver
+      containers:
+        - name: spiffe-csi-driver
+          # DO NOT CHANGE THE IMAGE VERSION FOR TESTS UNLESS YOU KNOW WHAT YOU ARE DOING.
+          image: ghcr.io/spiffe/spiffe-csi-driver:devel
+          imagePullPolicy: Never
+          args: [
+            "-workload-api-socket-dir", "/recursive-source",
+            "-plugin-name", "recursive.csi.spiffe.io",
+            "-csi-socket-path", "/spiffe-csi/csi.sock",
+            "-recursive-bind",
+          ]
+          env:
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            # HostToContainer, so that mounts made on the node after the driver
+            # starts reach it. The pods volume below is Bidirectional, so the
+            # runtime makes this mount shared as well, which is the case the
+            # driver has to correct at startup.
+            - mountPath: /recursive-source
+              name: recursive-source-dir
+              readOnly: true
+              mountPropagation: HostToContainer
+            - mountPath: /spiffe-csi
+              name: spiffe-csi-socket-dir
+            - mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+              name: mountpoint-dir
+          securityContext:
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - all
+            privileged: true
+        - name: node-driver-registrar
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.18.0
+          imagePullPolicy: IfNotPresent
+          args: [
+            "-csi-address", "/spiffe-csi/csi.sock",
+            "-kubelet-registration-path", "/var/lib/kubelet/plugins/recursive.csi.spiffe.io/csi.sock",
+          ]
+          volumeMounts:
+            - mountPath: /spiffe-csi
+              name: spiffe-csi-socket-dir
+            - name: kubelet-plugin-registration-dir
+              mountPath: /registration
+      volumes:
+        - name: recursive-source-dir
+          hostPath:
+            path: /run/spiffe-csi-test/recursive
+            type: DirectoryOrCreate
+        - name: spiffe-csi-socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/recursive.csi.spiffe.io
+            type: DirectoryOrCreate
+        - name: mountpoint-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: kubelet-plugin-registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: Directory
+---
+
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: "recursive.csi.spiffe.io"
+spec:
+  attachRequired: false
+  podInfoOnMount: true
+  fsGroupPolicy: None
+  volumeLifecycleModes:
+    - Ephemeral

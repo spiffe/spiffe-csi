@@ -41,6 +41,49 @@ at the requested target path.
 Similarly, when the pod is destroyed, the driver is invoked and removes the
 bind mount.
 
+## Recursive Bind
+
+By default the driver publishes only the socket directory itself. A filesystem
+mounted inside it is not carried along, and one mounted there later never
+appears. The `-recursive-bind` flag publishes the directory together with
+everything mounted beneath it, and keeps following those mounts as they are
+replaced. This is for a socket directory that holds a filesystem which can be
+remounted while workloads run, such as
+[spiffefs](https://github.com/spiffe/spiffefs) after a restart.
+
+It has some requirements:
+
+* The socket directory must be a volume of its own, mounted with
+  `mountPropagation: HostToContainer`. That is how mounts made on the host reach
+  the driver. The driver refuses to start with one that receives no mounts,
+  which is the case for `None`, because it would then only publish what was
+  mounted when it started.
+* At startup, the driver makes its own view of the socket directory a slave
+  mount. A container runtime makes every mount shared when any volume of the pod
+  is `Bidirectional`, and a CSI driver's kubelet pods directory always is. If the
+  directory stayed shared, removing one workload's volume would also unmount
+  what is beneath the socket directory for every other workload on the node.
+* Workloads must mount the volume with `mountPropagation: HostToContainer` to
+  pick up a filesystem that is remounted after they start.
+
+### Read-only only covers the top of the volume
+
+> **Warning:** with `-recursive-bind`, the read-only guarantee covers only the
+> socket directory itself, not anything mounted beneath it.
+
+The driver requires the volume to be read-only, but on Linux a read-only mount
+applies only to its top. Everything mounted beneath the socket directory
+reaches workloads with its own writability. It is also shared: every workload
+on the node that uses the driver sees the same mounts. So a writable filesystem
+there lets one workload change what another reads, or plant a socket that
+another connects to.
+
+Only mount filesystems beneath the socket directory that are read-only, or that
+give each caller its own view, as spiffefs does. The driver cannot enforce this:
+it can inspect mounts when it publishes a volume, but not ones that arrive later.
+`recursiveReadOnly` on the workload's volume mount does not help either, because
+Kubernetes only allows it with `mountPropagation: None`.
+
 ## Dependencies
 
 CSI Ephemeral Inline Volumes require at least Kubernetes 1.15 (enabled via the

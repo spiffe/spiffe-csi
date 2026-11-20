@@ -1,0 +1,73 @@
+# Two workloads on the recursive driver. They only need to read the volume, so
+# they idle rather than run the Workload API client.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recursive-workload-1
+  namespace: default
+  labels:
+    app: recursive-workload-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recursive-workload-1
+  template:
+    metadata:
+      namespace: default
+      labels:
+        app: recursive-workload-1
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+      - name: recursive-workload-1
+        image: spiffe-csi-test-workload:test
+        imagePullPolicy: Never
+        command: ["/bin/sh", "-c", "while true; do sleep 3600; done"]
+        volumeMounts:
+        - name: recursive
+          mountPath: /recursive
+          readOnly: true
+          # Required to see a filesystem mounted beneath the volume after the
+          # workload starts.
+          mountPropagation: HostToContainer
+      volumes:
+      - name: recursive
+        csi:
+          driver: "recursive.csi.spiffe.io"
+          readOnly: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recursive-workload-2
+  namespace: default
+  labels:
+    app: recursive-workload-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recursive-workload-2
+  template:
+    metadata:
+      namespace: default
+      labels:
+        app: recursive-workload-2
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+      - name: recursive-workload-2
+        image: spiffe-csi-test-workload:test
+        imagePullPolicy: Never
+        command: ["/bin/sh", "-c", "while true; do sleep 3600; done"]
+        volumeMounts:
+        - name: recursive
+          mountPath: /recursive
+          readOnly: true
+          mountPropagation: HostToContainer
+      volumes:
+      - name: recursive
+        csi:
+          driver: "recursive.csi.spiffe.io"
+          readOnly: true

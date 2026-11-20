@@ -21,6 +21,7 @@ var (
 	pluginNameFlag           = flag.String("plugin-name", "csi.spiffe.io", "Plugin name to register")
 	workloadAPISocketDirFlag = flag.String("workload-api-socket-dir", "", "Path to the Workload API socket directory")
 	logFormatFlag            = flag.String("log-format", "text", "Log format: text or json")
+	recursiveBindFlag        = flag.Bool("recursive-bind", false, "Also publish anything mounted beneath the Workload API socket directory")
 )
 
 func main() {
@@ -47,6 +48,7 @@ func main() {
 		logkeys.NodeID, nodeID,
 		logkeys.WorkloadAPISocketDir, *workloadAPISocketDirFlag,
 		logkeys.CSISocketPath, *csiSocketPathFlag,
+		logkeys.RecursiveBind, *recursiveBindFlag,
 	)
 
 	driver, err := driver.New(driver.Config{
@@ -54,6 +56,7 @@ func main() {
 		NodeID:               nodeID,
 		PluginName:           *pluginNameFlag,
 		WorkloadAPISocketDir: *workloadAPISocketDirFlag,
+		RecursiveBind:        *recursiveBindFlag,
 	})
 	if err != nil {
 		log.Error(err, "Failed to create driver")

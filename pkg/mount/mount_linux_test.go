@@ -26,6 +26,172 @@ func TestIsMountPoint(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestHasChildMounts(t *testing.T) {
+	for _, tt := range []struct {
+		desc       string
+		mountPoint string
+		want       bool
+	}{
+		{desc: "mount with children", mountPoint: "/var/lib/kubelet/pods", want: true},
+		{desc: "trailing slash", mountPoint: "/var/lib/kubelet/pods/", want: true},
+		{desc: "mount without children", mountPoint: "/var/lib/kubelet/pods/c3a32fc0-f186-4974-8579-429dea58ec6d/volumes/kubernetes.io~csi/spire-agent-socket/mount", want: false},
+		{desc: "sibling sharing a name prefix", mountPoint: "/var/lib/kubelet/po", want: false},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := HasChildMounts(tt.mountPoint)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestHasChildMountsInReader_OctalEscape(t *testing.T) {
+	const line = `36 35 0:0 / /mnt/has\040space/child rw,relatime - tmpfs tmpfs rw`
+	got, err := hasChildMountsInReader(strings.NewReader(line+"\n"), "/mnt/has space")
+	require.NoError(t, err)
+	assert.True(t, got)
+}
+
+func TestIsSharedMountInReader(t *testing.T) {
+	for _, tt := range []struct {
+		desc string
+		path string
+		want bool
+	}{
+		{desc: "private mount point", path: "/spire-agent-socket", want: false},
+		{desc: "beneath a private mount", path: "/spire-agent-socket/sub", want: false},
+		{desc: "shared and slave mount point", path: "/var/lib/kubelet/pods", want: true},
+		{desc: "beneath a shared mount", path: "/var/lib/kubelet/pods/not-a-mount", want: true},
+		{desc: "falls back to the root mount", path: "/etc/hosts-dir", want: false},
+		{desc: "unclean path", path: "/var/lib/kubelet/pods/../pods/", want: true},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			f, err := os.Open(procMountInfo)
+			require.NoError(t, err)
+			defer func() { _ = f.Close() }()
+
+			got, err := isSharedMountInReader(f, tt.path)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestIsSharedMountInReader_Propagation(t *testing.T) {
+	for _, tt := range []struct {
+		desc  string
+		lines []string
+		want  bool
+	}{
+		{
+			desc:  "slave only",
+			lines: []string{"1 0 0:1 / /sock rw master:7 - tmpfs t rw"},
+			want:  false,
+		},
+		{
+			desc:  "shared",
+			lines: []string{"1 0 0:1 / /sock rw shared:7 - tmpfs t rw"},
+			want:  true,
+		},
+		{
+			desc:  "shared field after the separator is not propagation",
+			lines: []string{"1 0 0:1 / /sock rw - tmpfs shared:7 rw"},
+			want:  false,
+		},
+		{
+			desc: "last mount at the same point is on top",
+			lines: []string{
+				"1 0 0:1 / /sock rw shared:7 - tmpfs t rw",
+				"2 1 0:2 / /sock rw master:7 - tmpfs t rw",
+			},
+			want: false,
+		},
+		{
+			desc: "deeper mount wins over its parent",
+			lines: []string{
+				"1 0 0:1 / / rw shared:1 - tmpfs t rw",
+				"2 1 0:2 / /sock rw - tmpfs t rw",
+			},
+			want: false,
+		},
+		{
+			desc:  "sibling sharing a name prefix does not contain the path",
+			lines: []string{"1 0 0:1 / / rw - tmpfs t rw", "2 1 0:2 / /so rw shared:7 - tmpfs t rw"},
+			want:  false,
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := isSharedMountInReader(strings.NewReader(strings.Join(tt.lines, "\n")+"\n"), "/sock")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestIsSlaveMountInReader(t *testing.T) {
+	for _, tt := range []struct {
+		desc  string
+		lines []string
+		want  bool
+	}{
+		{
+			desc:  "slave",
+			lines: []string{"1 0 0:1 / /sock rw master:7 - tmpfs t rw"},
+			want:  true,
+		},
+		{
+			desc:  "shared and slave",
+			lines: []string{"1 0 0:1 / /sock rw shared:8 master:7 - tmpfs t rw"},
+			want:  true,
+		},
+		{
+			desc:  "shared only",
+			lines: []string{"1 0 0:1 / /sock rw shared:7 - tmpfs t rw"},
+			want:  false,
+		},
+		{
+			desc:  "private",
+			lines: []string{"1 0 0:1 / /sock rw - tmpfs t rw"},
+			want:  false,
+		},
+		{
+			desc:  "master field after the separator is not propagation",
+			lines: []string{"1 0 0:1 / /sock rw - tmpfs master:7 rw"},
+			want:  false,
+		},
+		{
+			desc: "the mount on top decides",
+			lines: []string{
+				"1 0 0:1 / /sock rw master:7 - tmpfs t rw",
+				"2 1 0:2 / /sock rw - tmpfs t rw",
+			},
+			want: false,
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := isSlaveMountInReader(strings.NewReader(strings.Join(tt.lines, "\n")+"\n"), "/sock")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestIsSlaveMountInReaderFixture(t *testing.T) {
+	f, err := os.Open(procMountInfo)
+	require.NoError(t, err)
+	defer func() { _ = f.Close() }()
+
+	// shared:195 master:28 in the fixture.
+	got, err := isSlaveMountInReader(f, "/var/lib/kubelet/pods")
+	require.NoError(t, err)
+	assert.True(t, got)
+}
+
+func TestIsSharedMountInReader_NoContainingMount(t *testing.T) {
+	_, err := isSharedMountInReader(strings.NewReader("1 0 0:1 / /other rw - tmpfs t rw\n"), "/sock")
+	require.ErrorContains(t, err, "no mount contains")
+}
+
 // TestIsMountPointInReader_OctalEscape verifies that mount points containing
 // whitespace match against their octal-escaped representation in mountinfo
 // (e.g. "/mnt/has space" appears as "/mnt/has\040space" in field 5).

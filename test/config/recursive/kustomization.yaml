@@ -1,0 +1,3 @@
+resources:
+- spiffe-csi-driver-recursive.yaml
+- recursive-workloads.yaml
