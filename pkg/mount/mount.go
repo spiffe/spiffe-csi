@@ -8,7 +8,10 @@ func BindMountRW(root, mountPoint string) error {
 
 // BindMountRecursiveRW performs a read-write bind mount from root to mountPoint,
 // including anything mounted beneath root. Mounts made under root afterwards
-// propagate to mountPoint when root is on a shared mount.
+// reach mountPoint only if root receives propagation, as a slave or shared mount
+// does, since the bind inherits that relationship. If root is shared, mountPoint
+// also joins its peer group, so unmounts beneath mountPoint propagate back to
+// root; make root a slave first to prevent that (see MakeRSlave).
 //
 // The result can have child mounts, which Unmount refuses; see UnmountDetach.
 func BindMountRecursiveRW(root, mountPoint string) error {
