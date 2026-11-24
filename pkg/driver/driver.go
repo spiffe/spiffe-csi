@@ -153,10 +153,18 @@ func labelSocketDir(dir string) error {
 	}
 	// The directory goes last so a failed entry leaves it container_var_run_t and the next start retries.
 	if err := filepath.WalkDir(dir, func(path string, _ fs.DirEntry, err error) error {
-		if err != nil || path == dir {
+		if path == dir {
 			return err
 		}
-		return relabel(path)
+		if err == nil {
+			err = relabel(path)
+		}
+		// An entry can be removed while the walk runs, such as the agent
+		// replacing its socket, and then there is nothing left to relabel.
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return err
 	}); err != nil {
 		return err
 	}

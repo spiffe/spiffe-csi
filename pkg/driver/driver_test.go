@@ -259,6 +259,42 @@ func TestNewSELinux(t *testing.T) {
 		assert.Equal(t, []string{socket}, got)
 	})
 
+	t.Run("SELinux skips entries removed during the walk", func(t *testing.T) {
+		dir := t.TempDir()
+		// The entries sort before the socket, so the walk has to get past
+		// both of them to reach it.
+		removedBeforeRead := filepath.Join(dir, "a-removed-before-read")
+		require.NoError(t, os.WriteFile(removedBeforeRead, nil, 0o600))
+		removedBeforeSet := filepath.Join(dir, "b-removed-before-set")
+		require.NoError(t, os.WriteFile(removedBeforeSet, nil, 0o600))
+		socket := filepath.Join(dir, "socket")
+		require.NoError(t, os.WriteFile(socket, nil, 0o600))
+		got := map[string]string{}
+		// removedBeforeRead has no label, so reading it reports
+		// fs.ErrNotExist.
+		setSELinux(t, map[string]string{
+			dir:              "system_u:object_r:container_var_run_t:s0:c1,c2",
+			removedBeforeSet: "system_u:object_r:container_var_run_t:s0:c3,c4",
+			socket:           "system_u:object_r:container_var_run_t:s0:c5,c6",
+		}, func(path, label string) error {
+			if path == removedBeforeSet {
+				return fs.ErrNotExist
+			}
+			got[path] = label
+			return nil
+		})
+		_, err := New(Config{
+			Log:                  logr.Discard(),
+			NodeID:               testNodeID,
+			WorkloadAPISocketDir: dir,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{
+			dir:    "system_u:object_r:container_file_t:s0:c1,c2",
+			socket: "system_u:object_r:container_file_t:s0:c5,c6",
+		}, got)
+	})
+
 	t.Run("SELinux unreadable label skips relabel", func(t *testing.T) {
 		called := false
 		setSELinux(t, nil, func(string, string) error {
