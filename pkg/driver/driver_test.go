@@ -305,6 +305,37 @@ func TestNewSELinux(t *testing.T) {
 		}, got)
 	})
 
+	t.Run("SELinux relabels an entry replaced during the walk", func(t *testing.T) {
+		dir := t.TempDir()
+		socket := filepath.Join(dir, "socket")
+		require.NoError(t, os.WriteFile(socket, nil, 0o600))
+		// The socket has no label while the entries are first walked, as
+		// if the agent had removed it.
+		labels := map[string]string{
+			dir: "system_u:object_r:container_var_run_t:s0:c1,c2",
+		}
+		got := map[string]string{}
+		setSELinux(t, labels, func(path, label string) error {
+			if path == dir {
+				// The agent binds the new socket before the directory
+				// changes type, so the socket takes the old one.
+				labels[socket] = "system_u:object_r:container_var_run_t:s0:c3,c4"
+			}
+			got[path] = label
+			return nil
+		})
+		_, err := New(Config{
+			Log:                  logr.Discard(),
+			NodeID:               testNodeID,
+			WorkloadAPISocketDir: dir,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{
+			dir:    "system_u:object_r:container_file_t:s0:c1,c2",
+			socket: "system_u:object_r:container_file_t:s0:c3,c4",
+		}, got)
+	})
+
 	t.Run("SELinux unreadable label skips relabel", func(t *testing.T) {
 		called := false
 		setSELinux(t, nil, func(string, string) error {

@@ -151,24 +151,36 @@ func labelSocketDir(dir string) error {
 		parts[2] = "container_file_t"
 		return setFileLabel(path, strings.Join(parts, ":"))
 	}
-	// The directory goes last so a failed entry leaves it container_var_run_t and the next start retries.
-	if err := filepath.WalkDir(dir, func(path string, _ fs.DirEntry, err error) error {
-		if path == dir {
+	relabelEntries := func() error {
+		return filepath.WalkDir(dir, func(path string, _ fs.DirEntry, err error) error {
+			if path == dir {
+				return err
+			}
+			if err == nil {
+				err = relabel(path)
+			}
+			// An entry can be removed while the walk runs, such as the
+			// agent replacing its socket, and then there is nothing left
+			// to relabel.
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
 			return err
-		}
-		if err == nil {
-			err = relabel(path)
-		}
-		// An entry can be removed while the walk runs, such as the agent
-		// replacing its socket, and then there is nothing left to relabel.
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		return err
-	}); err != nil {
+		})
+	}
+	// The directory goes after its entries so a failed entry leaves it
+	// container_var_run_t and the next start retries.
+	if err := relabelEntries(); err != nil {
 		return err
 	}
-	return relabel(dir)
+	if err := relabel(dir); err != nil {
+		return err
+	}
+	// An entry created during the first pass, such as the socket the agent
+	// binds after removing the old one, took its type from the directory
+	// before it changed. Entries created from here on take
+	// container_file_t, so a second pass leaves none behind.
+	return relabelEntries()
 }
 
 /////////////////////////////////////////////////////////////////////////////
