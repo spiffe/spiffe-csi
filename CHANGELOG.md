@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0] - 2026-11-24
+
+### Added
+
+- `-recursive-bind` flag, which also publishes anything mounted beneath the Workload API socket directory and keeps tracking it as it is mounted and unmounted. It is off by default (#371)
+- On SELinux nodes, the driver now changes the type of the Workload API socket directory and its entries from `container_var_run_t` to `container_file_t` at startup, so workload containers can connect to the socket without an init container. This requires a writable mount of the socket directory in the driver container, and any other type is left unchanged (#391, #406)
+
+### Changed
+
+- Dependency updates
+
 ## [0.3.0] - 2026-10-23
 
 ### Security
