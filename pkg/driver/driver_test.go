@@ -262,23 +262,32 @@ func TestNewSELinux(t *testing.T) {
 	t.Run("SELinux skips entries removed during the walk", func(t *testing.T) {
 		dir := t.TempDir()
 		// The entries sort before the socket, so the walk has to get past
-		// both of them to reach it.
+		// all of them to reach it.
 		removedBeforeRead := filepath.Join(dir, "a-removed-before-read")
 		require.NoError(t, os.WriteFile(removedBeforeRead, nil, 0o600))
 		removedBeforeSet := filepath.Join(dir, "b-removed-before-set")
 		require.NoError(t, os.WriteFile(removedBeforeSet, nil, 0o600))
+		removedBeforeList := filepath.Join(dir, "c-removed-before-list")
+		require.NoError(t, os.Mkdir(removedBeforeList, 0o700))
 		socket := filepath.Join(dir, "socket")
 		require.NoError(t, os.WriteFile(socket, nil, 0o600))
 		got := map[string]string{}
 		// removedBeforeRead has no label, so reading it reports
 		// fs.ErrNotExist.
 		setSELinux(t, map[string]string{
-			dir:              "system_u:object_r:container_var_run_t:s0:c1,c2",
-			removedBeforeSet: "system_u:object_r:container_var_run_t:s0:c3,c4",
-			socket:           "system_u:object_r:container_var_run_t:s0:c5,c6",
+			dir:               "system_u:object_r:container_var_run_t:s0:c1,c2",
+			removedBeforeSet:  "system_u:object_r:container_var_run_t:s0:c3,c4",
+			removedBeforeList: "system_u:object_r:container_var_run_t:s0:c5,c6",
+			socket:            "system_u:object_r:container_var_run_t:s0:c7,c8",
 		}, func(path, label string) error {
-			if path == removedBeforeSet {
+			switch path {
+			case removedBeforeSet:
 				return fs.ErrNotExist
+			case removedBeforeList:
+				// The walk relabels a directory before listing it, so
+				// removing it here makes the walk itself report
+				// fs.ErrNotExist.
+				require.NoError(t, os.Remove(path))
 			}
 			got[path] = label
 			return nil
@@ -290,8 +299,9 @@ func TestNewSELinux(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, map[string]string{
-			dir:    "system_u:object_r:container_file_t:s0:c1,c2",
-			socket: "system_u:object_r:container_file_t:s0:c5,c6",
+			dir:               "system_u:object_r:container_file_t:s0:c1,c2",
+			removedBeforeList: "system_u:object_r:container_file_t:s0:c5,c6",
+			socket:            "system_u:object_r:container_file_t:s0:c7,c8",
 		}, got)
 	})
 
